@@ -8,6 +8,7 @@ from pangloss_core.models import (
     RELATION_IDENTIFIER,
     AbstractTrait,
     BaseNode,
+    BaseNodeReference,
     RelationConfig,
     RelationModel,
     RelationTo,
@@ -160,7 +161,7 @@ def test_reference_model_on_relation():
         cost_of_purchase: int
 
     class Pet(BaseNode):
-        pass
+        name: str
 
     class Crocodile(Pet):
         pass
@@ -201,6 +202,7 @@ def test_reference_model_on_relation():
     assert type(mf).__name__ == "PersonPetRelation_PetReference"
     assert mf.label == "Mr Frisky"
     assert mf.relation_data.cost_of_purchase == 200
+
     assert type(ms).__name__ == "PersonPetRelation_CrocodileReference"
     assert ms.label == "Mr Snappy"
     assert ms.relation_data.cost_of_purchase == 300

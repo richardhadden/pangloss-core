@@ -195,6 +195,7 @@ class RelationTo(Sequence):
         cls, args: tuple[type[RelationToType], RelationConfig]
     ) -> set[type[RelationToType]]:
         """Creates a Pydantic-friendly Annotated type"""
+
         try:
             related_type: type[BaseNode] = args[0]
         except TypeError:
@@ -202,6 +203,7 @@ class RelationTo(Sequence):
                 "A RelationConfig instance must be provided as part of the type annotation"
             )
 
+        related_type.model_rebuild(force=True)
         relation_config: RelationConfig = args[1]
 
         # Set the relation_config relation_to_base to the actual class concerned
