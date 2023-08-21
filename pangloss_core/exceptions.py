@@ -1,0 +1,2 @@
+class PanglossConfigError(Exception):
+    pass
