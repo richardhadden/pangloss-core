@@ -16,6 +16,7 @@ pydantic = "^2.2.1"
 icecream = "^2.1.3"
 pytest = "^7.4.0"
 black = "^23.7.0"
+pyright = "^1.1.323"
 
 [build-system]
 requires = ["poetry-core"]

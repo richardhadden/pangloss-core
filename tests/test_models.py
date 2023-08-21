@@ -177,7 +177,6 @@ def test_reference_model_on_relation():
             ),
         ]
 
-    print(Person.model_json_schema())
     p = Person(
         **{
             "uid": uuid4(),
@@ -193,10 +192,17 @@ def test_reference_model_on_relation():
                     "uid": uuid4(),
                     "label": "Mr Snappy",
                     "real_type": "crocodile",
-                    "relation_data": {"cost_of_purchase": 200},
+                    "relation_data": {"cost_of_purchase": 300},
                 },
             ],
         }
     )
-    print(Person.model_json_schema())
     assert len(p.pets) == 2
+    mf, ms = sorted(list(p.pets), key=lambda p: p.label)
+
+    assert type(mf).__name__ == "PersonPetRelation_PetReference"
+    assert mf.label == "Mr Frisky"
+    assert mf.relation_data.cost_of_purchase == 200
+    assert type(ms).__name__ == "PersonPetRelation_CrocodileReference"
+    assert ms.label == "Mr Snappy"
+    assert ms.relation_data.cost_of_purchase == 300

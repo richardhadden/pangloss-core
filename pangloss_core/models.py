@@ -176,7 +176,7 @@ class RelationConfig:
 RelationToType = TypeVar("RelationToType", type[BaseNode], type[BaseNode])
 
 
-class RelationTo(pydantic.BaseModel):
+class RelationTo(Sequence):
     """Defines a RelationTo type annotation, e.g.:
 
     ```
@@ -185,6 +185,9 @@ class RelationTo(pydantic.BaseModel):
     ```
     The `RelationConfig` is required, and must at least provide a `reverse_name`.
     """
+
+    # N.B. We inherit from Sequence so type checker allows us to call len() on this badboy
+    # without complaining
 
     def __class_getitem__(
         cls, args: tuple[RelationToType, RelationConfig]
