@@ -9,7 +9,9 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
+    NewType,
     Optional,
+    Self,
     Sequence,
     TypeVar,
     Union,
@@ -190,7 +192,7 @@ class RelationTo(Sequence):
     # without complaining
 
     def __class_getitem__(
-        cls, args: tuple[RelationToType, RelationConfig]
+        cls, args: tuple[type[RelationToType], RelationConfig]
     ) -> set[type[RelationToType]]:
         """Creates a Pydantic-friendly Annotated type"""
         try:

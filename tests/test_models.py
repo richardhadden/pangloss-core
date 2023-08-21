@@ -146,7 +146,6 @@ def test_relation_to():
     ]["anyOf"]
 
 
-"""
 def test_build_reference_model():
     class Person(BaseNode):
         pass
@@ -154,7 +153,6 @@ def test_build_reference_model():
     assert Person.Reference
     p = Person.Reference(uid=uuid4(), label="Tom Jones")
     assert p.real_type == "person"
-"""
 
 
 def test_reference_model_on_relation():
