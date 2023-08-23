@@ -89,7 +89,7 @@ class BaseNode(BaseNodeStandardFields):
         # Need to rebuild the model after deleting fields, to update everything properly
         cls.model_rebuild(force=True)
         cls.Reference = cls.__pg_create_reference_class__()
-        cls.__pg_get_relations_to__()
+        cls.RelationsTo = cls.__pg_get_relations_to__()
 
     @classmethod
     def __pg_get_relations_to__(cls) -> dict[str, type[BaseNode]]:
