@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from functools import lru_cache
 from typing import (
     Annotated,
@@ -16,7 +16,7 @@ from typing import (
     TypeVar,
     Union,
 )
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pydantic
 from annotated_types import BaseMetadata, MaxLen, MinLen
@@ -32,6 +32,7 @@ class ModelManager:
 
 
 RELATION_IDENTIFIER = "__relation__"
+EMBEDDED_NODE_IDENTIFIER = "__embedded_node__"
 
 
 class RelationModel(pydantic.BaseModel):
@@ -47,6 +48,8 @@ class BaseNodeStandardFields(pydantic.BaseModel):
 
 
 class BaseNodeReference(BaseNodeStandardFields):
+    # TODO: this is producing the option of relation model in JSON schema... It should only be null
+    # Maybe should add this as a field on create_relation_model, so it's absent unless we have a relation model
     relation_data: Optional[RelationModel | type[RelationModel]] = RelationModel()
     real_type: str = ""
 
@@ -56,6 +59,9 @@ class BaseNodeReference(BaseNodeStandardFields):
 
 class BaseNode(BaseNodeStandardFields):
     """Base Node should be Abstract by default"""
+
+    def __hash__(self):
+        return hash(self.uid)
 
     __abstract__ = True
 
@@ -73,10 +79,26 @@ class BaseNode(BaseNodeStandardFields):
         4. Build lists of Child Nodes, Relations, Reverse-Relations, RelatedReifications, ReverseRelatedReifications
 
         """
+        # Check whether __abstract__ is a defined on the current class, not parent
+        # and set the appropriate value on current class
+        cls.__abstract__ = cls.__dict__.get("__abstract__", False)
 
+        # Call to delete properties from indirect trait fields
         cls.__pg_delete_indirect_trait_fields__()
+
+        # Need to rebuild the model after deleting fields, to update everything properly
         cls.model_rebuild(force=True)
         cls.Reference = cls.__pg_create_reference_class__()
+        cls.__pg_get_relations_to__()
+
+    @classmethod
+    def __pg_get_relations_to__(cls) -> dict[str, type[BaseNode]]:
+        relations_to = {}
+        for field_name, field in cls.model_fields.items():
+            if RELATION_IDENTIFIER in field.metadata:
+                relations_to[field_name] = field.annotation.__args__[0]  # type: ignore
+                # ic(field.metadata)
+        return relations_to
 
     @classmethod
     def __pg_create_reference_class__(
@@ -160,18 +182,49 @@ class BaseNode(BaseNodeStandardFields):
 
     @classmethod
     @lru_cache
-    def __pg_all_subclasses__(cls) -> set[type[BaseNode]]:
+    def __pg_get_all_subclasses__(
+        cls, include_abstract: bool = False
+    ) -> set[type[BaseNode]]:
         subclasses = []
         for subclass in cls.__subclasses__():
-            subclasses += [subclass, *subclass.__pg_all_subclasses__()]
+            if not subclass.__abstract__ or include_abstract:
+                subclasses += [subclass, *subclass.__pg_get_all_subclasses__()]
+            else:
+                subclasses += [*subclass.__pg_get_all_subclasses__()]
         return set(subclasses)
+
+    def __init__(self, *args, **kwargs):
+        # If "uid" is not provided, it is because it is new
+        # and we need to create it to validate
+        if not kwargs.get("uid", None):
+            kwargs["uid"] = uuid4()
+
+        super().__init__(*args, **kwargs)
 
 
 @dataclass
 class RelationConfig:
+    """Provides configuration for a `RelationTo` type, e.g.:
+
+    ```
+    class Person:
+        pets: RelationTo[Pet, RelationConfig(reverse_name="owned_by")]
+    ```
+    """
+
     reverse_name: str
-    relation_to_base: ClassVar[Optional[type[BaseNode]]] = None
     relation_model: Optional[type[RelationModel]] = None
+    validators: Optional[Sequence[BaseMetadata]] = None
+
+
+@dataclass
+class _RelationConfigInstantiated(RelationConfig):
+    relation_to_base: Optional[type[RelationModel]] = None
+
+
+@dataclass
+class EmbeddedConfig:
+    child_node_base: ClassVar[Optional[type[BaseNode]]] = None
     validators: Optional[Sequence[BaseMetadata]] = None
 
 
@@ -206,11 +259,16 @@ class RelationTo(Sequence):
         related_type.model_rebuild(force=True)
         relation_config: RelationConfig = args[1]
 
-        # Set the relation_config relation_to_base to the actual class concerned
-        # Ignore type checking as we're cheating here...
-        relation_config.relation_to_base = related_type  # type: ignore
+        # Check if config validators are set, and if not, make an empty list for unpacking below
+        validators = relation_config.validators if relation_config.validators else []
 
+        # Build a new RelationConfigInstantiated model for the RelationConfig...
+        # and add in the relation_to_base type
+        relation_config = _RelationConfigInstantiated(
+            relation_to_base=related_type, **asdict(relation_config)  # type: ignore
+        )
         # Get the subclasses of related-to cls, as possible allowed types
+        # not including abstract classes
         related_types = tuple(
             [
                 related_type.__pg_create_reference_class__(
@@ -220,18 +278,84 @@ class RelationTo(Sequence):
                     rt.__pg_create_reference_class__(
                         relation_data_model=relation_config.relation_model
                     )
-                    for rt in related_type.__pg_all_subclasses__()
+                    for rt in related_type.__pg_get_all_subclasses__()
                 ],
             ]
+            if not related_type.__abstract__
+            else tuple(
+                [
+                    rt.__pg_create_reference_class__(
+                        relation_data_model=relation_config.relation_model
+                    )
+                    for rt in related_type.__pg_get_all_subclasses__()
+                ]
+            )
         )
-
-        # Check if config validators are set, and if not, make an empty list for unpacking below
-        validators = relation_config.validators if relation_config.validators else []
 
         # Return a Pydantic-friendly Annotated[] type
         # Need to do this # type: ignore hack here, as we are basically lying to the type checker
         # about what we are returning (dynamically constructing a list of sub-types)
         return Annotated[set[Union[*related_types]], *validators, relation_config, RELATION_IDENTIFIER]  # type: ignore
+
+
+class EmbeddedNode(Sequence):
+    """Defines a RelationTo type annotation, e.g.:
+
+    ```
+    class Person(BaseNode):
+        owns_pet: RelationTo[Pet, RelationConfig(reverse_name="is_owned_by")]
+    ```
+    The `RelationConfig` is required, and must at least provide a `reverse_name`.
+    """
+
+    # N.B. We inherit from Sequence so type checker allows us to call len() on this badboy
+    # without complaining
+
+    def __class_getitem__(
+        cls, args: tuple[type[RelationToType], EmbeddedConfig]
+    ) -> set[type[RelationToType]]:
+        """Creates a Pydantic-friendly Annotated type"""
+
+        try:
+            child_node_type: type[BaseNode] = args[0]
+        except TypeError:
+            raise PanglossConfigError(
+                "A RelationConfig instance must be provided as part of the type annotation"
+            )
+
+        child_node_type.model_rebuild(force=True)
+        child_node_config: EmbeddedConfig = args[1]
+
+        # Set the relation_config relation_to_base to the actual class concerned
+        # Ignore type checking as we're cheating here...
+        child_node_config.child_node_base = child_node_type  # type: ignore
+
+        # Get the subclasses of related-to cls, as possible allowed types
+        child_node_types = (
+            [child_node_type, *child_node_type.__pg_get_all_subclasses__()]
+            if not child_node_type.__abstract__
+            else child_node_type.__pg_get_all_subclasses__()
+        )
+        child_node_embedded_types = tuple(
+            [
+                pydantic.create_model(
+                    f"{child_node_type.__name__}Embedded",
+                    __base__=child_node_type,
+                    real_type=(Literal[child_node_type.__name__.lower()], child_node_type.__name__.lower()),  # type: ignore
+                )
+                for child_node_type in child_node_types
+            ]
+        )
+
+        # Check if config validators are set, and if not, make an empty list for unpacking below
+        validators = (
+            child_node_config.validators if child_node_config.validators else []
+        )
+
+        # Return a Pydantic-friendly Annotated[] type
+        # Need to do this # type: ignore hack here, as we are basically lying to the type checker
+        # about what we are returning (dynamically constructing a list of sub-types)
+        return Annotated[set[Union[*child_node_embedded_types]], *validators, child_node_config, EMBEDDED_NODE_IDENTIFIER]  # type: ignore
 
 
 class AbstractTrait:
