@@ -57,6 +57,13 @@ class BaseNodeReference(BaseNodeStandardFields):
         return hash(self.uid)
 
 
+@dataclass
+class _PG_OutgoingRelationDefinition:
+    target_base_class: type[BaseNode]
+    target_reference_class: type[BaseNodeReference]
+    relation_config: _PG_RelationshipConfigInstantiated
+
+
 class BaseNode(BaseNodeStandardFields):
     """Base Node should be Abstract by default"""
 
@@ -66,7 +73,7 @@ class BaseNode(BaseNodeStandardFields):
     __abstract__ = True
 
     Reference: ClassVar[type[BaseNodeReference]]
-    RelationsTo: ClassVar[dict[str, type[BaseNode]]]
+    outgoing_relations: ClassVar[dict[str, _PG_OutgoingRelationDefinition]]
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: dict[str, Any]) -> None:
@@ -89,15 +96,26 @@ class BaseNode(BaseNodeStandardFields):
         # Need to rebuild the model after deleting fields, to update everything properly
         cls.model_rebuild(force=True)
         cls.Reference = cls.__pg_create_reference_class__()
-        cls.RelationsTo = cls.__pg_get_relations_to__()
+        cls.outgoing_relations = cls.__pg_get_relations_to__()
 
     @classmethod
-    def __pg_get_relations_to__(cls) -> dict[str, type[BaseNode]]:
+    def __pg_get_relations_to__(cls) -> dict[str, _PG_OutgoingRelationDefinition]:
         relations_to = {}
         for field_name, field in cls.model_fields.items():
             if RELATION_IDENTIFIER in field.metadata:
-                relations_to[field_name] = field.annotation.__args__[0]  # type: ignore
-                # ic(field.metadata)
+                # Get the relation_config (don't know its position in annotation necessarily)
+                relation_config: _PG_RelationshipConfigInstantiated = [
+                    item
+                    for item in field.metadata
+                    if isinstance(item, _PG_RelationshipConfigInstantiated)
+                ][0]
+
+                relations_to[field_name] = _PG_OutgoingRelationDefinition(
+                    target_base_class=relation_config.relation_to_base,
+                    target_reference_class=field.annotation.__args__[0],  # type: ignore
+                    relation_config=relation_config,
+                )
+
         return relations_to
 
     @classmethod
@@ -218,8 +236,8 @@ class RelationConfig:
 
 
 @dataclass
-class _RelationConfigInstantiated(RelationConfig):
-    relation_to_base: Optional[type[RelationModel]] = None
+class _PG_RelationshipConfigInstantiated(RelationConfig):
+    relation_to_base: type[BaseNode] = None
 
 
 @dataclass
@@ -264,7 +282,7 @@ class RelationTo(Sequence):
 
         # Build a new RelationConfigInstantiated model for the RelationConfig...
         # and add in the relation_to_base type
-        relation_config = _RelationConfigInstantiated(
+        relation_config = _PG_RelationshipConfigInstantiated(
             relation_to_base=related_type, **asdict(relation_config)  # type: ignore
         )
         # Get the subclasses of related-to cls, as possible allowed types

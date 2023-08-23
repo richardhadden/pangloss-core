@@ -315,4 +315,12 @@ def test_get_relations_to():
     class Person(BaseNode):
         pets: RelationTo[Pet, RelationConfig(reverse_name="is_owned_by")]
 
-    assert Person.__pg_get_relations_to__()["pets"].__name__ == "PetReference"
+    assert (
+        Person.__pg_get_relations_to__()["pets"].target_reference_class.__name__
+        == "PetReference"
+    )
+    assert Person.__pg_get_relations_to__()["pets"].target_base_class == Pet
+    assert (
+        Person.outgoing_relations["pets"].target_reference_class.__name__
+        == "PetReference"
+    )
