@@ -262,7 +262,7 @@ def test_reference_model_on_relation():
     assert ms.relation_data.cost_of_purchase == 300
 
 
-def test_child_node():
+def test_embedded_node():
     class DateBase(BaseNode):
         __abstract__ = True
 
@@ -324,3 +324,21 @@ def test_get_relations_to():
         Person.outgoing_relations["pets"].target_reference_class.__name__
         == "PetReference"
     )
+
+
+def test_get_embedded_nodes():
+    class Date(BaseNode):
+        date: datetime.date
+
+    class Person(BaseNode):
+        date_of_birth: EmbeddedNode[Date, EmbeddedConfig()]
+
+    assert Person.__pg_get_embedded_nodes__()["date_of_birth"].embedded_class == Date
+    assert (
+        Person.__pg_get_embedded_nodes__()[
+            "date_of_birth"
+        ].embedded_config.embedded_node_base
+        == Date
+    )
+
+    assert Person.embedded_nodes["date_of_birth"].embedded_class == Date

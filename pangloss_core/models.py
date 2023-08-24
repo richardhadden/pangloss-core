@@ -64,6 +64,12 @@ class _PG_OutgoingRelationDefinition:
     relation_config: _PG_RelationshipConfigInstantiated
 
 
+@dataclass
+class _PG_EmbeddedNodeDefinition:
+    embedded_class: type[BaseNode]
+    embedded_config: _PG_EmbeddedConfigInstantiated
+
+
 class BaseNode(BaseNodeStandardFields):
     """Base Node should be Abstract by default"""
 
@@ -74,6 +80,7 @@ class BaseNode(BaseNodeStandardFields):
 
     Reference: ClassVar[type[BaseNodeReference]]
     outgoing_relations: ClassVar[dict[str, _PG_OutgoingRelationDefinition]]
+    embedded_nodes: ClassVar[dict[str, _PG_EmbeddedNodeDefinition]]
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: dict[str, Any]) -> None:
@@ -97,6 +104,7 @@ class BaseNode(BaseNodeStandardFields):
         cls.model_rebuild(force=True)
         cls.Reference = cls.__pg_create_reference_class__()
         cls.outgoing_relations = cls.__pg_get_relations_to__()
+        cls.embedded_nodes = cls.__pg_get_embedded_nodes__()
 
     @classmethod
     def __pg_get_relations_to__(cls) -> dict[str, _PG_OutgoingRelationDefinition]:
@@ -117,6 +125,23 @@ class BaseNode(BaseNodeStandardFields):
                 )
 
         return relations_to
+
+    @classmethod
+    def __pg_get_embedded_nodes__(cls) -> dict[str, _PG_EmbeddedNodeDefinition]:
+        embedded_nodes = {}
+        for field_name, field in cls.model_fields.items():
+            if EMBEDDED_NODE_IDENTIFIER in field.metadata:
+                embedded_node_config: _PG_EmbeddedConfigInstantiated = [
+                    item
+                    for item in field.metadata
+                    if isinstance(item, _PG_EmbeddedConfigInstantiated)
+                ][0]
+
+                embedded_nodes[field_name] = _PG_EmbeddedNodeDefinition(
+                    embedded_class=embedded_node_config.embedded_node_base,
+                    embedded_config=embedded_node_config,
+                )
+        return embedded_nodes
 
     @classmethod
     def __pg_create_reference_class__(
@@ -236,13 +261,27 @@ class RelationConfig:
 
 
 @dataclass
-class _PG_RelationshipConfigInstantiated(RelationConfig):
-    relation_to_base: type[BaseNode] = None
+class _PG_RelationshipConfigInstantiated:
+    """Internal version of RelationConfig for storing the config on
+    relationship declaration. Avoids exposing the `relation_to_base` variable
+    as something settable by user. Redeclares variables
+    instead of inheriting from RelationConfig to avoid issue with ordering variables
+    with default-less variables first, which is impossible when inheriting!"""
+
+    reverse_name: str
+    relation_to_base: type[BaseNode]
+    relation_model: Optional[type[RelationModel]] = None
+    validators: Optional[Sequence[BaseMetadata]] = None
 
 
 @dataclass
 class EmbeddedConfig:
-    child_node_base: ClassVar[Optional[type[BaseNode]]] = None
+    validators: Optional[Sequence[BaseMetadata]] = None
+
+
+@dataclass
+class _PG_EmbeddedConfigInstantiated:
+    embedded_node_base: type[BaseNode]
     validators: Optional[Sequence[BaseMetadata]] = None
 
 
@@ -335,45 +374,50 @@ class EmbeddedNode(Sequence):
         """Creates a Pydantic-friendly Annotated type"""
 
         try:
-            child_node_type: type[BaseNode] = args[0]
+            embedded_node_type: type[BaseNode] = args[0]
         except TypeError:
             raise PanglossConfigError(
                 "A RelationConfig instance must be provided as part of the type annotation"
             )
 
-        child_node_type.model_rebuild(force=True)
-        child_node_config: EmbeddedConfig = args[1]
+        embedded_node_type.model_rebuild(force=True)
+        embedded_node_config: EmbeddedConfig = args[1]
 
         # Set the relation_config relation_to_base to the actual class concerned
         # Ignore type checking as we're cheating here...
-        child_node_config.child_node_base = child_node_type  # type: ignore
+        validators = (
+            embedded_node_config.validators if embedded_node_config.validators else []
+        )
+
+        embedded_node_config_instantiated: _PG_EmbeddedConfigInstantiated = (
+            _PG_EmbeddedConfigInstantiated(
+                embedded_node_base=embedded_node_type, **asdict(embedded_node_config)
+            )
+        )
 
         # Get the subclasses of related-to cls, as possible allowed types
-        child_node_types = (
-            [child_node_type, *child_node_type.__pg_get_all_subclasses__()]
-            if not child_node_type.__abstract__
-            else child_node_type.__pg_get_all_subclasses__()
+        embedded_node_types = (
+            [embedded_node_type, *embedded_node_type.__pg_get_all_subclasses__()]
+            if not embedded_node_type.__abstract__
+            else embedded_node_type.__pg_get_all_subclasses__()
         )
-        child_node_embedded_types = tuple(
+        embedded_node_embedded_types = tuple(
             [
                 pydantic.create_model(
                     f"{child_node_type.__name__}Embedded",
                     __base__=child_node_type,
                     real_type=(Literal[child_node_type.__name__.lower()], child_node_type.__name__.lower()),  # type: ignore
                 )
-                for child_node_type in child_node_types
+                for child_node_type in embedded_node_types
             ]
         )
 
         # Check if config validators are set, and if not, make an empty list for unpacking below
-        validators = (
-            child_node_config.validators if child_node_config.validators else []
-        )
 
         # Return a Pydantic-friendly Annotated[] type
         # Need to do this # type: ignore hack here, as we are basically lying to the type checker
         # about what we are returning (dynamically constructing a list of sub-types)
-        return Annotated[set[Union[*child_node_embedded_types]], *validators, child_node_config, EMBEDDED_NODE_IDENTIFIER]  # type: ignore
+        return Annotated[set[Union[*embedded_node_embedded_types]], *validators, embedded_node_config_instantiated, EMBEDDED_NODE_IDENTIFIER]  # type: ignore
 
 
 class AbstractTrait:
