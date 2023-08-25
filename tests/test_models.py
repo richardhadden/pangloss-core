@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 from uuid import uuid4
 
@@ -31,6 +33,13 @@ def test_model_init():
     thing = Thing(uid=uuid4(), label="Someone", name="Someone", age=42)
 
     assert thing.label == "Someone"
+
+
+def test_relation_properties_not_allowed_as_field_name():
+    with pytest.raises(PanglossConfigError):
+
+        class Thing(BaseNode):
+            relation_properties: int
 
 
 def test_basic_field_inheritance():
@@ -313,7 +322,7 @@ def test_get_relations_to():
         pass
 
     class Person(BaseNode):
-        pets: RelationTo[Pet, RelationConfig(reverse_name="is_owned_by")]
+        pets: RelationTo[Pet, RelationConfig(reverse_name="has_owner")]
 
     assert (
         Person.__pg_get_relations_to__()["pets"].target_reference_class.__name__
@@ -342,3 +351,48 @@ def test_get_embedded_nodes():
     )
 
     assert Person.embedded_nodes["date_of_birth"].embedded_class == Date
+
+
+def test_incoming_relations():
+    """Incoming relation definitions should allow same reverse_name to be used on
+    multiple classes, and should create a unique definition for each"""
+
+    # TODO: potential issue with test leaking, in that it is pulling in Person class from previous test...
+    # (should not be problem, as classes can be defined only once)
+    # #-- to make sure, we define some some of the "leaking" crap here to make sure it does not go wrong
+
+    class Pet(BaseNode):
+        pass
+
+    class Person(BaseNode):
+        pets: RelationTo[Pet, RelationConfig(reverse_name="has_owner")]
+
+    # Now the classes of the test
+    class Nun(BaseNode):
+        pass
+
+    class JuniorNun(Nun):
+        pass
+
+    class DudeNunRelation(RelationModel):
+        purchased_when: datetime.date
+
+    class Adult(BaseNode):
+        nuns: RelationTo[
+            Nun,
+            RelationConfig(reverse_name="is_owned_by", relation_model=DudeNunRelation),
+        ]
+
+    class Dude(Adult):
+        pass
+
+    class Organisation(BaseNode):
+        nuns: RelationTo[Nun, RelationConfig(reverse_name="is_owned_by")]
+
+    pet_has_owner = Nun.incoming_relations["is_owned_by"]
+
+    types_to_be_connected_to = set([Adult, Dude, Organisation])
+
+    incoming_related_types = set([ir.origin_base_class for ir in pet_has_owner])
+
+    assert types_to_be_connected_to.issubset(incoming_related_types)

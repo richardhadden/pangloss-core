@@ -50,7 +50,7 @@ class BaseNodeStandardFields(pydantic.BaseModel):
 class BaseNodeReference(BaseNodeStandardFields):
     # TODO: this is producing the option of relation model in JSON schema... It should only be null
     # Maybe should add this as a field on create_relation_model, so it's absent unless we have a relation model
-    relation_data: Optional[RelationModel | type[RelationModel]] = RelationModel()
+    relation_properties: Optional[RelationModel | type[RelationModel]] = RelationModel()
     real_type: str = ""
 
     def __hash__(self):
@@ -62,6 +62,20 @@ class _PG_OutgoingRelationDefinition:
     target_base_class: type[BaseNode]
     target_reference_class: type[BaseNodeReference]
     relation_config: _PG_RelationshipConfigInstantiated
+
+
+@dataclass
+class _PG_IncomingRelationDefinition:
+    origin_base_class: type[BaseNode]
+    origin_reference_class: type[BaseNodeReference]
+    relation_config: _PG_RelationshipConfigInstantiated
+
+    def __hash__(self):
+        return hash(
+            repr(self.origin_base_class)
+            + repr(self.origin_reference_class)
+            + repr(self.relation_config)
+        )
 
 
 @dataclass
@@ -81,6 +95,9 @@ class BaseNode(BaseNodeStandardFields):
     Reference: ClassVar[type[BaseNodeReference]]
     outgoing_relations: ClassVar[dict[str, _PG_OutgoingRelationDefinition]]
     embedded_nodes: ClassVar[dict[str, _PG_EmbeddedNodeDefinition]]
+    incoming_relations: ClassVar[dict[str, set[_PG_IncomingRelationDefinition]]] = {}
+
+    __inited_subclasses: ClassVar[set] = set()
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: dict[str, Any]) -> None:
@@ -95,7 +112,13 @@ class BaseNode(BaseNodeStandardFields):
         """
         # Check whether __abstract__ is a defined on the current class, not parent
         # and set the appropriate value on current class
+        if cls in cls.__inited_subclasses:
+            ic("ALREAD INN")
+            return
+
         cls.__abstract__ = cls.__dict__.get("__abstract__", False)
+
+        cls.__pg_run_init_subclass_checks__()
 
         # Call to delete properties from indirect trait fields
         cls.__pg_delete_indirect_trait_fields__()
@@ -105,10 +128,53 @@ class BaseNode(BaseNodeStandardFields):
         cls.Reference = cls.__pg_create_reference_class__()
         cls.outgoing_relations = cls.__pg_get_relations_to__()
         cls.embedded_nodes = cls.__pg_get_embedded_nodes__()
+        cls.__pg_add_incoming_relations_to_related_models__()
+
+    @classmethod
+    def __pg_run_init_subclass_checks__(cls):
+        for field_name, field in cls.model_fields.items():
+            if field_name == "relation_properties":
+                raise PanglossConfigError(
+                    f"Field 'relation_properties' (on model {cls.__name__}) is a reserved name. Please rename this field."
+                )
+
+    @classmethod
+    def __pg_add_incoming_relations_to_related_models__(cls):
+        for relation_name, relation_definition in cls.__pg_get_relations_to__().items():
+            if (
+                relation_definition.relation_config.reverse_name
+                in relation_definition.target_base_class.incoming_relations
+            ):
+                relation_definition.target_base_class.incoming_relations[
+                    relation_definition.relation_config.reverse_name
+                ].add(
+                    _PG_IncomingRelationDefinition(
+                        origin_base_class=cls,
+                        origin_reference_class=cls.__pg_create_reference_class__(
+                            relation_definition.relation_config.relation_model
+                        ),
+                        relation_config=relation_definition.relation_config,
+                    )
+                )
+            else:
+                relation_definition.target_base_class.incoming_relations[
+                    relation_definition.relation_config.reverse_name
+                ] = set(
+                    [
+                        _PG_IncomingRelationDefinition(
+                            origin_base_class=cls,
+                            origin_reference_class=cls.__pg_create_reference_class__(
+                                relation_definition.relation_config.relation_model
+                            ),
+                            relation_config=relation_definition.relation_config,
+                        )
+                    ]
+                )
 
     @classmethod
     def __pg_get_relations_to__(cls) -> dict[str, _PG_OutgoingRelationDefinition]:
         relations_to = {}
+        ic(cls, cls.model_fields.keys())
         for field_name, field in cls.model_fields.items():
             if RELATION_IDENTIFIER in field.metadata:
                 # Get the relation_config (don't know its position in annotation necessarily)
@@ -224,7 +290,6 @@ class BaseNode(BaseNodeStandardFields):
         return set(traits_as_indirect_ancestors)
 
     @classmethod
-    @lru_cache
     def __pg_get_all_subclasses__(
         cls, include_abstract: bool = False
     ) -> set[type[BaseNode]]:
