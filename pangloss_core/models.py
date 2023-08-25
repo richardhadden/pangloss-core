@@ -62,6 +62,7 @@ class _PG_OutgoingRelationDefinition:
     target_base_class: type[BaseNode]
     target_reference_class: type[BaseNodeReference]
     relation_config: _PG_RelationshipConfigInstantiated
+    origin_base_class: type[BaseNode]
 
 
 @dataclass
@@ -69,6 +70,7 @@ class _PG_IncomingRelationDefinition:
     origin_base_class: type[BaseNode]
     origin_reference_class: type[BaseNodeReference]
     relation_config: _PG_RelationshipConfigInstantiated
+    target_base_class: type[BaseNode]
 
     def __hash__(self):
         return hash(
@@ -95,7 +97,7 @@ class BaseNode(BaseNodeStandardFields):
     Reference: ClassVar[type[BaseNodeReference]]
     outgoing_relations: ClassVar[dict[str, _PG_OutgoingRelationDefinition]]
     embedded_nodes: ClassVar[dict[str, _PG_EmbeddedNodeDefinition]]
-    incoming_relations: ClassVar[dict[str, set[_PG_IncomingRelationDefinition]]] = {}
+    incoming_relations: ClassVar[dict[str, set[_PG_IncomingRelationDefinition]]]
 
     __inited_subclasses: ClassVar[set] = set()
 
@@ -112,9 +114,6 @@ class BaseNode(BaseNodeStandardFields):
         """
         # Check whether __abstract__ is a defined on the current class, not parent
         # and set the appropriate value on current class
-        if cls in cls.__inited_subclasses:
-            ic("ALREAD INN")
-            return
 
         cls.__abstract__ = cls.__dict__.get("__abstract__", False)
 
@@ -124,11 +123,13 @@ class BaseNode(BaseNodeStandardFields):
         cls.__pg_delete_indirect_trait_fields__()
 
         # Need to rebuild the model after deleting fields, to update everything properly
-        cls.model_rebuild(force=True)
+
         cls.Reference = cls.__pg_create_reference_class__()
         cls.outgoing_relations = cls.__pg_get_relations_to__()
-        cls.embedded_nodes = cls.__pg_get_embedded_nodes__()
+        cls.incoming_relations = {}
         cls.__pg_add_incoming_relations_to_related_models__()
+        cls.embedded_nodes = cls.__pg_get_embedded_nodes__()
+        cls.model_rebuild(force=True)
 
     @classmethod
     def __pg_run_init_subclass_checks__(cls):
@@ -141,6 +142,8 @@ class BaseNode(BaseNodeStandardFields):
     @classmethod
     def __pg_add_incoming_relations_to_related_models__(cls):
         for relation_name, relation_definition in cls.__pg_get_relations_to__().items():
+            # ic(relation_definition.target_base_class.incoming_relations)
+
             if (
                 relation_definition.relation_config.reverse_name
                 in relation_definition.target_base_class.incoming_relations
@@ -154,6 +157,7 @@ class BaseNode(BaseNodeStandardFields):
                             relation_definition.relation_config.relation_model
                         ),
                         relation_config=relation_definition.relation_config,
+                        target_base_class=relation_definition.target_base_class,
                     )
                 )
             else:
@@ -167,6 +171,7 @@ class BaseNode(BaseNodeStandardFields):
                                 relation_definition.relation_config.relation_model
                             ),
                             relation_config=relation_definition.relation_config,
+                            target_base_class=relation_definition.target_base_class,
                         )
                     ]
                 )
@@ -174,7 +179,6 @@ class BaseNode(BaseNodeStandardFields):
     @classmethod
     def __pg_get_relations_to__(cls) -> dict[str, _PG_OutgoingRelationDefinition]:
         relations_to = {}
-        ic(cls, cls.model_fields.keys())
         for field_name, field in cls.model_fields.items():
             if RELATION_IDENTIFIER in field.metadata:
                 # Get the relation_config (don't know its position in annotation necessarily)
@@ -188,6 +192,7 @@ class BaseNode(BaseNodeStandardFields):
                     target_base_class=relation_config.relation_to_base,
                     target_reference_class=field.annotation.__args__[0],  # type: ignore
                     relation_config=relation_config,
+                    origin_base_class=cls,
                 )
 
         return relations_to
@@ -229,7 +234,6 @@ class BaseNode(BaseNodeStandardFields):
 
     @classmethod
     @property
-    @lru_cache
     def __pg_model_labels__(cls) -> list[str]:
         """All neo4j labels for model.
 
@@ -258,7 +262,6 @@ class BaseNode(BaseNodeStandardFields):
 
     @classmethod
     @property
-    @lru_cache
     def __pg_traits_as_direct_ancestors__(cls) -> set[AbstractTrait]:
         """Identifies Traits that are directly applied to a model class"""
         traits_as_direct_bases = []
@@ -274,7 +277,6 @@ class BaseNode(BaseNodeStandardFields):
 
     @classmethod
     @property
-    @lru_cache
     def __pg_traits_as_indirect_ancestors__(cls) -> set[AbstractTrait]:
         traits_as_indirect_ancestors = []
         traits_as_direct_ancestors = cls.__pg_traits_as_direct_ancestors__

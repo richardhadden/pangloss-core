@@ -360,12 +360,13 @@ def test_incoming_relations():
     # TODO: potential issue with test leaking, in that it is pulling in Person class from previous test...
     # (should not be problem, as classes can be defined only once)
     # #-- to make sure, we define some some of the "leaking" crap here to make sure it does not go wrong
-
+    """
     class Pet(BaseNode):
         pass
 
     class Person(BaseNode):
         pets: RelationTo[Pet, RelationConfig(reverse_name="has_owner")]
+    """
 
     # Now the classes of the test
     class Nun(BaseNode):
@@ -389,10 +390,14 @@ def test_incoming_relations():
     class Organisation(BaseNode):
         nuns: RelationTo[Nun, RelationConfig(reverse_name="is_owned_by")]
 
-    pet_has_owner = Nun.incoming_relations["is_owned_by"]
+    nun_has_owner = Nun.incoming_relations["is_owned_by"]
 
     types_to_be_connected_to = set([Adult, Dude, Organisation])
 
-    incoming_related_types = set([ir.origin_base_class for ir in pet_has_owner])
+    incoming_related_types = set([ir.origin_base_class for ir in nun_has_owner])
 
     assert types_to_be_connected_to.issubset(incoming_related_types)
+
+
+# TODO: relations to traits
+# TODO: abstract reifications
