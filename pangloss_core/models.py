@@ -142,8 +142,6 @@ class BaseNode(BaseNodeStandardFields):
     @classmethod
     def __pg_add_incoming_relations_to_related_models__(cls):
         for relation_name, relation_definition in cls.__pg_get_relations_to__().items():
-            # ic(relation_definition.target_base_class.incoming_relations)
-
             if (
                 relation_definition.relation_config.reverse_name
                 in relation_definition.target_base_class.incoming_relations

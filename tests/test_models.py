@@ -369,30 +369,36 @@ def test_incoming_relations():
     """
 
     # Now the classes of the test
-    class Nun(BaseNode):
+    class Pet(BaseNode):
         pass
 
-    class JuniorNun(Nun):
+    class Crocodile(Pet):
         pass
 
-    class DudeNunRelation(RelationModel):
+    class PersonPetRelation(RelationModel):
         purchased_when: datetime.date
 
-    class Adult(BaseNode):
+    class Person(BaseNode):
         nuns: RelationTo[
-            Nun,
-            RelationConfig(reverse_name="is_owned_by", relation_model=DudeNunRelation),
+            Pet,
+            RelationConfig(
+                reverse_name="is_owned_by", relation_model=PersonPetRelation
+            ),
         ]
 
-    class Dude(Adult):
+    class Dude(Person):
         pass
 
     class Organisation(BaseNode):
-        nuns: RelationTo[Nun, RelationConfig(reverse_name="is_owned_by")]
+        nuns: RelationTo[Pet, RelationConfig(reverse_name="is_owned_by")]
 
-    nun_has_owner = Nun.incoming_relations["is_owned_by"]
+    assert len(Pet.incoming_relations) == 1
 
-    types_to_be_connected_to = set([Adult, Dude, Organisation])
+    nun_has_owner = Pet.incoming_relations["is_owned_by"]
+
+    assert len(nun_has_owner) == 3
+
+    types_to_be_connected_to = set([Person, Dude, Organisation])
 
     incoming_related_types = set([ir.origin_base_class for ir in nun_has_owner])
 
