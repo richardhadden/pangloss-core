@@ -14,6 +14,7 @@ from pangloss_core.models import (
     BaseNodeReference,
     EmbeddedConfig,
     EmbeddedNode,
+    ModelManager,
     RelationConfig,
     RelationModel,
     RelationTo,
@@ -33,6 +34,26 @@ def test_model_init():
     thing = Thing(uid=uuid4(), label="Someone", name="Someone", age=42)
 
     assert thing.label == "Someone"
+
+
+def test_model_init_from_camel_dict():
+    """Tests that models can be populated by the equivalent camelCase (standard for JSON API),
+    which is automatically converted to snake_case"""
+
+    class Thing(BaseNode):
+        one_thing: int
+        another_thing: str
+
+    thing = Thing(  # type: ignore
+        **{
+            "uid": uuid4(),
+            "label": "something",
+            "oneThing": 42,
+            "anotherThing": "another thing",
+        }
+    )
+
+    assert thing.one_thing == 42
 
 
 def test_relation_properties_not_allowed_as_field_name():
@@ -357,17 +378,6 @@ def test_incoming_relations():
     """Incoming relation definitions should allow same reverse_name to be used on
     multiple classes, and should create a unique definition for each"""
 
-    # TODO: potential issue with test leaking, in that it is pulling in Person class from previous test...
-    # (should not be problem, as classes can be defined only once)
-    # #-- to make sure, we define some some of the "leaking" crap here to make sure it does not go wrong
-    """
-    class Pet(BaseNode):
-        pass
-
-    class Person(BaseNode):
-        pets: RelationTo[Pet, RelationConfig(reverse_name="has_owner")]
-    """
-
     # Now the classes of the test
     class Pet(BaseNode):
         pass
@@ -403,6 +413,21 @@ def test_incoming_relations():
     incoming_related_types = set([ir.origin_base_class for ir in nun_has_owner])
 
     assert types_to_be_connected_to.issubset(incoming_related_types)
+
+
+def test_add_to_model_manager():
+    class Person(BaseNode):
+        pass
+
+    class OneThing(BaseNode):
+        pass
+
+    assert ModelManager["person"]
+    assert ModelManager["Person"]
+
+    assert ModelManager["one_thing"]
+    assert ModelManager["OneThing"]
+    assert ModelManager["one-thing"]
 
 
 # TODO: relations to traits

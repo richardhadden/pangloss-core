@@ -18,6 +18,7 @@ from typing import (
 )
 from uuid import UUID, uuid4
 
+import humps
 import pydantic
 from annotated_types import BaseMetadata, MaxLen, MinLen
 from icecream import ic
@@ -27,19 +28,44 @@ from typing_extensions import Unpack
 from pangloss_core.exceptions import PanglossConfigError
 
 
-class ModelManager:
-    pass
+class CamelModel(pydantic.BaseModel):
+    """Converts fields by default from Python snake_case to Javascript Schema CamelCase and back.
 
+    Modified from Ahmed Nafies's code for Pydantic 2.0, which renames 'allow_population_by_name' to 'populate_by_name'
+    """
+
+    __author__ = "Ahmed Nafies <ahmed.nafies@gmail.com>"
+    __copyright__ = "Copyright 2020, Ahmed Nafies"
+    __license__ = "MIT"
+    __version__ = "1.0.5"
+
+    model_config = {"alias_generator": humps.camelize, "populate_by_name": True}
+
+
+class ModelManagerClass(dict):
+    """Stores references to all the defined Pangloss models.
+
+    Model names are stored using kebab-case, which should be used for
+    """
+
+    def add_model(self, model_class: type[BaseNode]):
+        self[humps.kebabize(model_class.__name__)] = model_class
+
+    def __getitem__(self, __key: Any) -> Any:
+        return super().__getitem__(humps.kebabize(__key))
+
+
+ModelManager = ModelManagerClass()
 
 RELATION_IDENTIFIER = "__relation__"
 EMBEDDED_NODE_IDENTIFIER = "__embedded_node__"
 
 
-class RelationModel(pydantic.BaseModel):
+class RelationModel(CamelModel):
     pass
 
 
-class BaseNodeStandardFields(pydantic.BaseModel):
+class BaseNodeStandardFields(CamelModel):
     __abstract__ = True
 
     # Standard fields for all Reference types
@@ -130,6 +156,8 @@ class BaseNode(BaseNodeStandardFields):
         cls.__pg_add_incoming_relations_to_related_models__()
         cls.embedded_nodes = cls.__pg_get_embedded_nodes__()
         cls.model_rebuild(force=True)
+
+        ModelManager.add_model(cls)
 
     @classmethod
     def __pg_run_init_subclass_checks__(cls):
@@ -489,7 +517,7 @@ class AbstractTrait:
     pass
 
 
-class AbstractMixin(pydantic.BaseModel):
+class AbstractMixin(CamelModel):
     pass
 
 
