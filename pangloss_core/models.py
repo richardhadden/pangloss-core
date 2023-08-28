@@ -143,6 +143,7 @@ class BaseNode(BaseNodeStandardFields):
 
         cls.__abstract__ = cls.__dict__.get("__abstract__", False)
 
+        # Run all the checks for validity to model (to be added below as appropriate)
         cls.__pg_run_init_subclass_checks__()
 
         # Call to delete properties from indirect trait fields
@@ -154,13 +155,23 @@ class BaseNode(BaseNodeStandardFields):
         cls.outgoing_relations = cls.__pg_get_relations_to__()
         cls.incoming_relations = {}
         cls.__pg_add_incoming_relations_to_related_models__()
+        cls.__pg_add_type_to_trait_list_of_real_types__()
         cls.embedded_nodes = cls.__pg_get_embedded_nodes__()
         cls.model_rebuild(force=True)
 
         ModelManager.add_model(cls)
 
     @classmethod
+    def __pg_add_type_to_trait_list_of_real_types__(cls):
+        for trait in cls.__pg_traits_as_direct_ancestors__:
+            trait.__pg_real_types_with_trait__.add(cls)
+
+    @classmethod
     def __pg_run_init_subclass_checks__(cls):
+        """Run checks on subclasses for validity, following rules below.
+
+        1. Cannot have field named `relation_properties` as this is used internally
+        2. ..."""
         for field_name, field in cls.model_fields.items():
             if field_name == "relation_properties":
                 raise PanglossConfigError(
@@ -394,20 +405,39 @@ class RelationTo(Sequence):
     # N.B. We inherit from Sequence so type checker allows us to call len() on this badboy
     # without complaining
 
+    @classmethod
+    def __pg_create_annotation_for_relation_to_concrete_class__(
+        cls, related_type: type[RelationToType], relation_config: RelationConfig
+    ):
+        pass
+
+    @classmethod
+    def __pg_create_annotation_for_relation_to_trait__(
+        cls, related_type: type[AbstractTrait], relation_config: RelationConfig
+    ):
+        pass
+
     def __class_getitem__(
-        cls, args: tuple[type[RelationToType], RelationConfig]
+        cls, args: tuple[type[RelationToType] | type[AbstractTrait], RelationConfig]
     ) -> set[type[RelationToType]]:
         """Creates a Pydantic-friendly Annotated type"""
 
         try:
-            related_type: type[BaseNode] = args[0]
+            related_type: type[BaseNode] | type[AbstractTrait] = args[0]
         except TypeError:
             raise PanglossConfigError(
                 "A RelationConfig instance must be provided as part of the type annotation"
             )
-
-        related_type.model_rebuild(force=True)
         relation_config: RelationConfig = args[1]
+
+        if (
+            issubclass(related_type, AbstractTrait)
+            and related_type.__pg_is_subclass_of_trait__
+        ):
+            ic(cls, related_type)
+            return cls.__pg_create_annotation_for_relation_to_trait__(
+                related_type=related_type, relation_config=relation_config
+            )
 
         # Check if config validators are set, and if not, make an empty list for unpacking below
         validators = relation_config.validators if relation_config.validators else []
@@ -514,7 +544,24 @@ class EmbeddedNode(Sequence):
 
 
 class AbstractTrait:
-    pass
+    __pg_real_types_with_trait__: set
+
+    @classmethod
+    @property
+    def __pg_is_subclass_of_trait__(cls):
+        """Determine whether a class is a subclass of AbstractTrait,
+        not the application of a trait to a real BaseNode class.
+
+        This should work by not having BaseNode in its class hierarchy
+        """
+        for parent in cls.mro()[1:]:
+            if issubclass(parent, BaseNode):
+                return False
+        else:
+            return True
+
+    def __init_subclass__(cls):
+        cls.__pg_real_types_with_trait__ = set()
 
 
 class AbstractMixin(CamelModel):

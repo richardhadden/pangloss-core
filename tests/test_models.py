@@ -430,5 +430,73 @@ def test_add_to_model_manager():
     assert ModelManager["one-thing"]
 
 
+def test_traits_keep_track_of_their_real_classes():
+    class Purchaseable(AbstractTrait):
+        price: int
+
+    class CheaplyPurchaseable(Purchaseable):
+        pass
+
+    class Punchable(AbstractTrait):
+        pass
+
+    class Thing(BaseNode):
+        pass
+
+    class PurchaseableThing(Thing, Purchaseable):
+        pass
+
+    class Politician(BaseNode, Purchaseable, Punchable):
+        pass
+
+    class NonPurchaseablePolitician(Politician):
+        pass
+
+    class CheaplyPurchaseableThing(Thing, CheaplyPurchaseable):
+        pass
+
+    assert Purchaseable.__pg_real_types_with_trait__ == set(
+        [PurchaseableThing, Politician]
+    )
+
+    assert Punchable.__pg_real_types_with_trait__ == set([Politician])
+
+    assert CheaplyPurchaseable.__pg_real_types_with_trait__ == set(
+        [CheaplyPurchaseableThing]
+    )
+
+
+def test_subclass_of_trait():
+    class Purchaseable(AbstractTrait):
+        price: int
+
+    class Thing(BaseNode):
+        pass
+
+    class PurchaseableThing(Thing, Purchaseable):
+        pass
+
+    assert Purchaseable.__pg_is_subclass_of_trait__
+    assert not PurchaseableThing.__pg_is_subclass_of_trait__
+
+
+def test_relation_to_trait():
+    class Purchaseable(AbstractTrait):
+        price: int
+
+    class Thing(BaseNode):
+        pass
+
+    class PurchaseableThing(Thing, Purchaseable):
+        pass
+
+    class Person:
+        purchased_stuff: RelationTo[
+            Purchaseable, RelationConfig(reverse_name="purchased_by")
+        ]
+
+    assert Person.asdfasd
+
+
 # TODO: relations to traits
 # TODO: abstract reifications
