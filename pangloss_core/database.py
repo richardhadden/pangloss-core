@@ -67,18 +67,19 @@ def db_transaction(
 
 @db_transaction
 async def get(tx, n: int, x: str, y: str) -> ReturnType:
-    result = await tx.run("MATCH (n) RETURN n{.real_type, x: $x}", x=x)
+    result = await tx.run("MATCH (n) RETURN n", x=x)
     records = await result.values()
-    ic(records)
+
     return ReturnType(**records[0][0])
 
 
-async def main():
+async def api_call():
     res = await get(1, "ar", "se")
 
     ic(res)
+    return res
 
 
 if __name__ == "__main__":
     # asyncio.run(main())
-    asyncio.run(main())
+    asyncio.run(api_call())

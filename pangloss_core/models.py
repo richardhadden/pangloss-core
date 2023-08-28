@@ -469,11 +469,11 @@ class EmbeddedNode(Sequence):
         embedded_node_embedded_types = tuple(
             [
                 pydantic.create_model(
-                    f"{child_node_type.__name__}Embedded",
-                    __base__=child_node_type,
-                    real_type=(Literal[child_node_type.__name__.lower()], child_node_type.__name__.lower()),  # type: ignore
+                    f"{embedded_node_type.__name__}Embedded",
+                    __base__=embedded_node_type,
+                    real_type=(Literal[embedded_node_type.__name__.lower()], embedded_node_type.__name__.lower()),  # type: ignore
                 )
-                for child_node_type in embedded_node_types
+                for embedded_node_type in embedded_node_types
             ]
         )
 
