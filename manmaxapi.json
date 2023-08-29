@@ -1,0 +1,61 @@
+{
+    "type": "factoid",
+    "id": "http://manmax.madeup/factoid/1",
+    "reference": {
+        "source": {
+            "id": "http://manmax.madeup/source/1",
+            "label": "The big book of Max"
+        },
+        "page": 1
+    },
+    "statements": [
+        {
+            "type": "naming",
+            "id": "http://manmax.madeup/naming/1",
+            "person_named": {
+                "id": "http://manmax.madeup/person/1",
+                "label": "Maximilian I"
+            },
+            "label": "Maximilian called Kaiser Maximilian",
+            "first_name": "Kaiser",
+            "last_name": "Maximilian"
+        },
+        {
+            "type": "order",
+            "id": "http://manmax.madeup/order/1",
+            "persons_giving_order": [
+                {
+                    "type": "person",
+                    "id": "http://manmax.madeup/person/1",
+                    "label": "Maximilian I"
+                }
+            ],
+            "persons_receiving_order": [
+                {
+                    "type": "person",
+                    "id": "http://manmax.madeup/person/2",
+                    "label": "Bishop of Ghent"
+                }
+            ],
+            "thing_ordered": [
+                {
+                    "type": "payment",
+                    "payer": [
+                        {
+                            "type": "person",
+                            "id": "http://manmax.madeup/person/2",
+                            "label": "Bishop of Ghent"
+                        }
+                    ],
+                    "recipient": [
+                        {
+                            "type": "person",
+                            "id": "http://manmax.madeup/person/2",
+                            "label": "A man"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

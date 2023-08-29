@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import typing
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from typing import (
@@ -182,9 +183,43 @@ class BaseNode(BaseNodeStandardFields):
     def __pg_add_incoming_relations_to_related_models__(cls):
         for relation_name, relation_definition in cls.__pg_get_relations_to__().items():
             if (
-                relation_definition.relation_config.reverse_name
-                in relation_definition.target_base_class.incoming_relations
+                issubclass(relation_definition.target_base_class, AbstractTrait)
+                and relation_definition.target_base_class.__pg_is_subclass_of_trait__
             ):
+                # ic(relation_definition.target_base_class.__pg_real_types_with_trait__)
+                for (
+                    target_base_class
+                ) in relation_definition.target_base_class.__pg_real_types_with_trait__:
+                    if (
+                        relation_definition.relation_config.reverse_name
+                        not in target_base_class.incoming_relations
+                    ):
+                        target_base_class.incoming_relations[
+                            relation_definition.relation_config.reverse_name
+                        ] = set()
+
+                    target_base_class.incoming_relations[
+                        relation_definition.relation_config.reverse_name
+                    ].add(
+                        _PG_IncomingRelationDefinition(
+                            origin_base_class=cls,
+                            origin_reference_class=cls.__pg_create_reference_class__(
+                                target_base_class
+                            ),
+                            relation_config=relation_definition.relation_config,
+                            target_base_class=target_base_class,
+                        )
+                    )
+
+            else:
+                if (
+                    relation_definition.relation_config.reverse_name
+                    not in relation_definition.target_base_class.incoming_relations
+                ):
+                    relation_definition.target_base_class.incoming_relations[
+                        relation_definition.relation_config.reverse_name
+                    ] = set()
+
                 relation_definition.target_base_class.incoming_relations[
                     relation_definition.relation_config.reverse_name
                 ].add(
@@ -196,21 +231,6 @@ class BaseNode(BaseNodeStandardFields):
                         relation_config=relation_definition.relation_config,
                         target_base_class=relation_definition.target_base_class,
                     )
-                )
-            else:
-                relation_definition.target_base_class.incoming_relations[
-                    relation_definition.relation_config.reverse_name
-                ] = set(
-                    [
-                        _PG_IncomingRelationDefinition(
-                            origin_base_class=cls,
-                            origin_reference_class=cls.__pg_create_reference_class__(
-                                relation_definition.relation_config.relation_model
-                            ),
-                            relation_config=relation_definition.relation_config,
-                            target_base_class=relation_definition.target_base_class,
-                        )
-                    ]
                 )
 
     @classmethod
@@ -224,6 +244,8 @@ class BaseNode(BaseNodeStandardFields):
                     for item in field.metadata
                     if isinstance(item, _PG_RelationshipConfigInstantiated)
                 ][0]
+
+                # TODO: think about this... do we want single classes, or all the subtypes as well?
 
                 relations_to[field_name] = _PG_OutgoingRelationDefinition(
                     target_base_class=relation_config.relation_to_base,
@@ -408,37 +430,7 @@ class RelationTo(Sequence):
     @classmethod
     def __pg_create_annotation_for_relation_to_concrete_class__(
         cls, related_type: type[RelationToType], relation_config: RelationConfig
-    ):
-        pass
-
-    @classmethod
-    def __pg_create_annotation_for_relation_to_trait__(
-        cls, related_type: type[AbstractTrait], relation_config: RelationConfig
-    ):
-        pass
-
-    def __class_getitem__(
-        cls, args: tuple[type[RelationToType] | type[AbstractTrait], RelationConfig]
     ) -> set[type[RelationToType]]:
-        """Creates a Pydantic-friendly Annotated type"""
-
-        try:
-            related_type: type[BaseNode] | type[AbstractTrait] = args[0]
-        except TypeError:
-            raise PanglossConfigError(
-                "A RelationConfig instance must be provided as part of the type annotation"
-            )
-        relation_config: RelationConfig = args[1]
-
-        if (
-            issubclass(related_type, AbstractTrait)
-            and related_type.__pg_is_subclass_of_trait__
-        ):
-            ic(cls, related_type)
-            return cls.__pg_create_annotation_for_relation_to_trait__(
-                related_type=related_type, relation_config=relation_config
-            )
-
         # Check if config validators are set, and if not, make an empty list for unpacking below
         validators = relation_config.validators if relation_config.validators else []
 
@@ -477,6 +469,67 @@ class RelationTo(Sequence):
         # about what we are returning (dynamically constructing a list of sub-types)
         return Annotated[set[Union[*related_types]], *validators, relation_config, RELATION_IDENTIFIER]  # type: ignore
 
+    @classmethod
+    def __pg_create_annotation_for_relation_to_trait__(
+        cls, related_type: type[AbstractTrait], relation_config: RelationConfig
+    ) -> set[type[BaseNode]]:
+        validators = relation_config.validators if relation_config.validators else []
+
+        concrete_related_types: set[
+            BaseNode
+        ] = related_type.__pg_real_types_with_trait__
+
+        relation_config = _PG_RelationshipConfigInstantiated(
+            relation_to_base=related_type, **asdict(relation_config)  # type: ignore
+        )
+
+        all_related_types = []
+        for concrete_related_type in concrete_related_types:
+            # ic(concrete_related_type)
+            # ic(relation_config)
+            # Build a new RelationConfigInstantiated model for the RelationConfig...
+            # and add in the relation_to_base type
+
+            # Get the subclasses of related-to cls, as possible allowed types
+            # not including abstract classes
+            all_related_types.append(
+                concrete_related_type.__pg_create_reference_class__(
+                    relation_data_model=relation_config.relation_model
+                )
+            )
+        all_related_types = tuple(all_related_types)
+        # Return a Pydantic-friendly Annotated[] type
+        # Need to do this # type: ignore hack here, as we are basically lying to the type checker
+        # about what we are returning (dynamically constructing a list of sub-types)
+        return Annotated[set[Union[*all_related_types]], *validators, relation_config, RELATION_IDENTIFIER]  # type: ignore
+
+    def __class_getitem__(
+        cls, args: tuple[type[RelationToType] | type[AbstractTrait], RelationConfig]
+    ) -> set[type[RelationToType] | type[BaseNode]]:
+        """Creates a Pydantic-friendly Annotated type"""
+
+        try:
+            related_type: type[BaseNode] | type[AbstractTrait] = args[0]
+        except TypeError:
+            raise PanglossConfigError(
+                "A RelationConfig instance must be provided as part of the type annotation"
+            )
+        relation_config: RelationConfig = args[1]
+
+        if (
+            issubclass(related_type, AbstractTrait)
+            and related_type.__pg_is_subclass_of_trait__
+        ):
+            return cls.__pg_create_annotation_for_relation_to_trait__(
+                related_type=related_type, relation_config=relation_config
+            )
+
+        else:
+            related_type = typing.cast(type[BaseNode], related_type)
+            return cls.__pg_create_annotation_for_relation_to_concrete_class__(
+                related_type=related_type, relation_config=relation_config
+            )
+
 
 class EmbeddedNode(Sequence):
     """Defines a RelationTo type annotation, e.g.:
@@ -491,20 +544,142 @@ class EmbeddedNode(Sequence):
     # N.B. We inherit from Sequence so type checker allows us to call len() on this badboy
     # without complaining
 
+    # TODO: can also embed traits, MFs!
+
+    @classmethod
+    def __pg_create_annotation_for_embedded_node__(
+        cls,
+        embedded_node_type: type[RelationToType],
+        embedded_node_config: EmbeddedConfig,
+    ) -> set[type[RelationToType]]:
+        validators = (
+            embedded_node_config.validators if embedded_node_config.validators else []
+        )
+
+        embedded_node_config_instantiated: _PG_EmbeddedConfigInstantiated = (
+            _PG_EmbeddedConfigInstantiated(
+                embedded_node_base=embedded_node_type, **asdict(embedded_node_config)
+            )
+        )
+
+        # Get the subclasses of related-to cls, as possible allowed types
+        embedded_node_types = (
+            [embedded_node_type, *embedded_node_type.__pg_get_all_subclasses__()]
+            if not embedded_node_type.__abstract__
+            else embedded_node_type.__pg_get_all_subclasses__()
+        )
+        embedded_node_embedded_types = tuple(
+            [
+                pydantic.create_model(
+                    f"{embedded_node_type.__name__}Embedded",
+                    __base__=embedded_node_type,
+                    real_type=(Literal[embedded_node_type.__name__.lower()], embedded_node_type.__name__.lower()),  # type: ignore
+                )
+                for embedded_node_type in embedded_node_types
+            ]
+        )
+
+        # Check if config validators are set, and if not, make an empty list for unpacking below
+
+        # Return a Pydantic-friendly Annotated[] type
+        # Need to do this # type: ignore hack here, as we are basically lying to the type checker
+        # about what we are returning (dynamically constructing a list of sub-types)
+        return Annotated[set[Union[*embedded_node_embedded_types]], *validators, embedded_node_config_instantiated, EMBEDDED_NODE_IDENTIFIER]  # type: ignore
+
+    @classmethod
+    def __pg_create_annotation_for_embedded_trait__(
+        cls,
+        embedded_node_type: type[AbstractTrait],
+        embedded_node_config: RelationConfig,
+    ) -> set[type[BaseNode]]:
+        validators = (
+            embedded_node_config.validators if embedded_node_config.validators else []
+        )
+
+        concrete_embedded_types: set[
+            BaseNode
+        ] = embedded_node_type.__pg_real_types_with_trait__
+
+        embedded_node_config = _PG_EmbeddedConfigInstantiated(
+            embedded_node_base=embedded_node_type, **asdict(embedded_node_config)  # type: ignore
+        )
+
+        embedded_node_embedded_types = []
+
+        # ic(concrete_related_type)
+        # ic(relation_config)
+        # Build a new RelationConfigInstantiated model for the RelationConfig...
+        # and add in the relation_to_base type
+
+        # Get the subclasses of related-to cls, as possible allowed types
+        # not including abstract classes
+        embedded_node_embedded_types = []
+        for concrete_embedded_type in concrete_embedded_types:
+            ic(concrete_embedded_type)
+            embedded_node_embedded_types.append(
+                pydantic.create_model(
+                    f"{concrete_embedded_type.__name__}Embedded",
+                    __base__=concrete_embedded_type,
+                    real_type=(Literal[concrete_embedded_type.__name__.lower()], concrete_embedded_type.__name__.lower()),  # type: ignore
+                )
+            )
+
+        embedded_node_embedded_types = tuple(embedded_node_embedded_types)
+        # Return a Pydantic-friendly Annotated[] type
+        # Need to do this # type: ignore hack here, as we are basically lying to the type checker
+        # about what we are returning (dynamically constructing a list of sub-types)
+        return Annotated[set[Union[*embedded_node_embedded_types]], *validators, embedded_node_config, EMBEDDED_NODE_IDENTIFIER]  # type: ignore
+
     def __class_getitem__(
-        cls, args: tuple[type[RelationToType], EmbeddedConfig]
+        cls, args: type[RelationToType] | tuple[type[RelationToType], EmbeddedConfig]
     ) -> set[type[RelationToType]]:
         """Creates a Pydantic-friendly Annotated type"""
 
-        try:
-            embedded_node_type: type[BaseNode] = args[0]
-        except TypeError:
-            raise PanglossConfigError(
-                "A RelationConfig instance must be provided as part of the type annotation"
+        if isinstance(args, tuple) and len(args) == 2:
+            if not inspect.isclass(args[0]) or not issubclass(
+                args[0], (BaseNode, AbstractTrait)
+            ):
+                raise PanglossConfigError(
+                    f"The first argument to EmbeddedNode must be a subclass of BaseNode, not {type(args[0]).__name__}"
+                )
+
+            if not isinstance(args[1], EmbeddedConfig):
+                raise PanglossConfigError(
+                    f"The second (optional) argument to EmbeddedNode must be an instance of EmbeddedConfig, not {type(args).__name__}"
+                )
+
+            embedded_node_type: type[BaseNode] | type[AbstractTrait] = args[0]
+            embedded_node_config: EmbeddedConfig = args[1]
+        else:
+            if not inspect.isclass(args) or not issubclass(
+                args, (BaseNode, AbstractTrait)
+            ):
+                raise PanglossConfigError(
+                    f"The first argument to EmbeddedNode must be a subclass of BaseNode, not {type(args).__name__}"
+                )
+
+            embedded_node_type: type[BaseNode] | type[AbstractTrait] = args
+            embedded_node_config: EmbeddedConfig = EmbeddedConfig()
+
+        if (
+            issubclass(embedded_node_type, AbstractTrait)
+            and embedded_node_type.__pg_is_subclass_of_trait__
+        ):
+            return cls.__pg_create_annotation_for_embedded_trait__(
+                embedded_node_type=embedded_node_type,
+                embedded_node_config=embedded_node_config,
             )
 
-        embedded_node_type.model_rebuild(force=True)
-        embedded_node_config: EmbeddedConfig = args[1]
+        elif issubclass(embedded_node_type, BaseNode):
+            return cls.__pg_create_annotation_for_embedded_node__(
+                embedded_node_type=embedded_node_type,
+                embedded_node_config=embedded_node_config,
+            )
+
+        else:
+            raise PanglossConfigError("Something went wrong")
+
+        # embedded_node_type.model_rebuild(force=True)
 
         # Set the relation_config relation_to_base to the actual class concerned
         # Ignore type checking as we're cheating here...

@@ -374,6 +374,21 @@ def test_get_embedded_nodes():
     assert Person.embedded_nodes["date_of_birth"].embedded_class == Date
 
 
+def test_embedded_node_does_not_need_config():
+    class Date(BaseNode):
+        date: datetime.date
+
+    class Person(BaseNode):
+        date_of_birth: EmbeddedNode[Date]
+
+
+def test_embedded_node_checks():
+    with pytest.raises(PanglossConfigError):
+
+        class Person(BaseNode):
+            date_of_birth: EmbeddedNode["balls"]
+
+
 def test_incoming_relations():
     """Incoming relation definitions should allow same reverse_name to be used on
     multiple classes, and should create a unique definition for each"""
@@ -490,13 +505,74 @@ def test_relation_to_trait():
     class PurchaseableThing(Thing, Purchaseable):
         pass
 
-    class Person:
+    class OtherPurchaseableThing(Thing, Purchaseable):
+        pass
+
+    class Pet(BaseNode):
+        pass
+
+    class Person(BaseNode):
+        purchased_stuff: RelationTo[
+            Purchaseable, RelationConfig(reverse_name="purchased_by")
+        ]
+        pets: RelationTo[Pet, RelationConfig(reverse_name="is_owned_by")]
+
+    class Organisation(BaseNode):
         purchased_stuff: RelationTo[
             Purchaseable, RelationConfig(reverse_name="purchased_by")
         ]
 
-    assert Person.asdfasd
+    assert set(
+        [
+            m.__name__
+            for m in Person.model_fields["purchased_stuff"]
+            .annotation.__args__[0]
+            .__args__
+        ]
+    ) == set(["OtherPurchaseableThingReference", "PurchaseableThingReference"])
+
+    assert (
+        Person.outgoing_relations["purchased_stuff"].target_base_class == Purchaseable
+    )
+
+    assert len(PurchaseableThing.incoming_relations) == 1
+    assert len(OtherPurchaseableThing.incoming_relations) == 1
+
+    assert len(PurchaseableThing.incoming_relations["purchased_by"]) == 2
+    assert {
+        rel_def.origin_base_class
+        for rel_def in PurchaseableThing.incoming_relations["purchased_by"]
+    } == {Person, Organisation}
+
+    assert len(OtherPurchaseableThing.incoming_relations["purchased_by"]) == 2
+    assert {
+        rel_def.origin_base_class
+        for rel_def in OtherPurchaseableThing.incoming_relations["purchased_by"]
+    } == {Person, Organisation}
 
 
-# TODO: relations to traits
+def test_embedded_trait():
+    class Purchaseable(AbstractTrait):
+        price: int
+
+    class Thing(BaseNode):
+        pass
+
+    class PurchaseableThing(Thing, Purchaseable):
+        pass
+
+    class OtherPurchaseableThing(Thing, Purchaseable):
+        pass
+
+    class Pet(BaseNode):
+        pass
+
+    class Person(BaseNode):
+        purchased_stuff: EmbeddedNode[Purchaseable]
+
+    assert Person.embedded_nodes["purchased_stuff"]
+
+
+# TODO: Embedded traits
+# TODO: relations to traits DONE!
 # TODO: abstract reifications
