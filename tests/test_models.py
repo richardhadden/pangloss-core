@@ -573,6 +573,20 @@ def test_embedded_trait():
     assert Person.embedded_nodes["purchased_stuff"]
 
 
-# TODO: Embedded traits
+def test_reverse_relation_to_embedded():
+    class Source:
+        pass
+
+    class Reference:
+        source: RelationTo[
+            Source, RelationConfig(reverse_name="is_source_of_reference")
+        ]
+
+    class Article:
+        reference: EmbeddedNode[Reference]
+
+
+# TODO: Embedded traits DONE!
+# TODO: relations to embedded traits...
 # TODO: relations to traits DONE!
 # TODO: abstract reifications
