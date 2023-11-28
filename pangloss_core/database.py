@@ -66,7 +66,7 @@ def db_transaction(
 
 
 @db_transaction
-async def get(tx, n: int, x: str, y: str) -> ReturnType:
+async def get(tx, n: int, x: str, y: str, z: int) -> ReturnType:
     result = await tx.run("MATCH (n) RETURN n", x=x)
     records = await result.values()
 
@@ -74,7 +74,7 @@ async def get(tx, n: int, x: str, y: str) -> ReturnType:
 
 
 async def api_call():
-    res = await get(1, "ar", "se")
+    res = await get(1, "ar", "se", 1)
 
     ic(res)
     return res

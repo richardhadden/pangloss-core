@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import typing
+from collections import defaultdict
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from typing import (
@@ -62,6 +63,12 @@ RELATION_IDENTIFIER = "__relation__"
 EMBEDDED_NODE_IDENTIFIER = "__embedded_node__"
 
 
+def __pg_instantiates_abstract_trait__(
+    cls: type[BaseNode] | type[AbstractMixin],
+) -> bool:
+    return issubclass(cls, AbstractTrait) and cls.__pg_is_subclass_of_trait__
+
+
 class RelationModel(CamelModel):
     pass
 
@@ -104,6 +111,27 @@ class _PG_IncomingRelationDefinition:
             repr(self.origin_base_class)
             + repr(self.origin_reference_class)
             + repr(self.relation_config)
+        )
+
+
+@dataclass
+class _PG_IncomingRelationViaEmbeddedDefinition:
+    origin_base_class: type[BaseNode]  # The origin of the reverse relation (the parent)
+    origin_reference_class: type[BaseNodeReference]
+    # embedded_base_class: type[BaseNode]
+    origin_to_embedded_relation_config: _PG_EmbeddedConfigInstantiated
+
+    # embedded_to_target_relation_config: _PG_RelationshipConfigInstantiated
+    target_base_class: type[BaseNode]
+
+    def __hash__(self):
+        return hash(
+            repr(self.origin_base_class)
+            + repr(self.origin_reference_class)
+            + repr(self.origin_to_embedded_relation_config)
+            # + repr(self.embedded_base_class)
+            # + repr(self.embedded_to_target_relation_config)
+            + repr(self.target_base_class)
         )
 
 
@@ -153,11 +181,22 @@ class BaseNode(BaseNodeStandardFields):
         # Need to rebuild the model after deleting fields, to update everything properly
 
         cls.Reference = cls.__pg_create_reference_class__()
-        cls.outgoing_relations = cls.__pg_get_relations_to__()
-        cls.incoming_relations = {}
-        cls.__pg_add_incoming_relations_to_related_models__()
-        cls.__pg_add_type_to_trait_list_of_real_types__()
         cls.embedded_nodes = cls.__pg_get_embedded_nodes__()
+
+        cls.outgoing_relations = cls.__pg_get_relations_to__()
+
+        cls.incoming_relations_through_embedded: dict[
+            str, set[_PG_IncomingRelationViaEmbeddedDefinition]
+        ] = defaultdict(set)
+        cls.__pg_add_incoming_relations_through_embedded__()
+
+        cls.incoming_relations: dict[
+            str, set[_PG_IncomingRelationDefinition]
+        ] = defaultdict(set)
+        cls.__pg_add_incoming_relations_to_related_models__()
+
+        cls.__pg_add_type_to_trait_list_of_real_types__()
+
         cls.model_rebuild(force=True)
 
         ModelManager.add_model(cls)
@@ -180,23 +219,92 @@ class BaseNode(BaseNodeStandardFields):
                 )
 
     @classmethod
+    def __pg_add_incoming_relations_through_embedded__(cls):
+        for (
+            embedded_field_name,
+            embedded_node_definition,
+        ) in cls.embedded_nodes.items():
+            if __pg_instantiates_abstract_trait__(
+                embedded_node_definition.embedded_class
+            ):
+                continue
+
+            for (
+                relation_from_embeddded_name,
+                relation_from_embedded_definition,
+            ) in embedded_node_definition.embedded_class.outgoing_relations.items():
+                if (
+                    issubclass(
+                        relation_from_embedded_definition.target_base_class,
+                        AbstractTrait,
+                    )
+                    and relation_from_embedded_definition.target_base_class.__pg_is_subclass_of_trait__
+                ):
+                    for (
+                        target_base_class
+                    ) in (
+                        relation_from_embedded_definition.target_base_class.__pg_real_types_with_trait__
+                    ):
+                        target_base_class.incoming_relations_through_embedded[
+                            relation_from_embedded_definition.relation_config.reverse_name
+                        ].add(
+                            _PG_IncomingRelationViaEmbeddedDefinition(
+                                origin_base_class=cls,
+                                origin_reference_class=cls.__pg_create_reference_class__(
+                                    relation_from_embedded_definition.relation_config.relation_model
+                                ),
+                                # embedded_base_class=relation_from_embedded_definition.origin_base_class,
+                                origin_to_embedded_relation_config=embedded_node_definition.embedded_config,
+                                # embedded_to_target_relation_config=relation_from_embedded_definition.relation_config,
+                                target_base_class=target_base_class,
+                            )
+                        )
+
+                else:
+                    relation_from_embedded_definition.target_base_class.incoming_relations_through_embedded[
+                        relation_from_embedded_definition.relation_config.reverse_name
+                    ].add(
+                        _PG_IncomingRelationViaEmbeddedDefinition(
+                            origin_base_class=cls,
+                            origin_reference_class=cls.__pg_create_reference_class__(
+                                relation_from_embedded_definition.relation_config.relation_model
+                            ),
+                            # embedded_base_class=relation_from_embedded_definition.origin_base_class,
+                            origin_to_embedded_relation_config=embedded_node_definition.embedded_config,
+                            # embedded_to_target_relation_config=relation_from_embedded_definition.relation_config,
+                            target_base_class=relation_from_embedded_definition.target_base_class,
+                        )
+                    )
+                    for (
+                        embedded_field_name,
+                        embedded_node_definition,
+                    ) in cls.embedded_nodes.items():
+                        for (
+                            efn,
+                            end,
+                        ) in (
+                            embedded_node_definition.embedded_class.embedded_nodes.items()
+                        ):
+                            ic(cls, end)
+
+    @classmethod
     def __pg_add_incoming_relations_to_related_models__(cls):
         for relation_name, relation_definition in cls.__pg_get_relations_to__().items():
+            # If reverse relation is to a trait, then we need all the possible instantiating-types
+            # of that trait
+
+            # Don't add embedded node defs here, as we do it above
+            if "Embedded" in cls.__name__:
+                return
+
             if (
                 issubclass(relation_definition.target_base_class, AbstractTrait)
                 and relation_definition.target_base_class.__pg_is_subclass_of_trait__
             ):
-                # ic(relation_definition.target_base_class.__pg_real_types_with_trait__)
                 for (
                     target_base_class
                 ) in relation_definition.target_base_class.__pg_real_types_with_trait__:
-                    if (
-                        relation_definition.relation_config.reverse_name
-                        not in target_base_class.incoming_relations
-                    ):
-                        target_base_class.incoming_relations[
-                            relation_definition.relation_config.reverse_name
-                        ] = set()
+                    # If there is no
 
                     target_base_class.incoming_relations[
                         relation_definition.relation_config.reverse_name
@@ -212,14 +320,6 @@ class BaseNode(BaseNodeStandardFields):
                     )
 
             else:
-                if (
-                    relation_definition.relation_config.reverse_name
-                    not in relation_definition.target_base_class.incoming_relations
-                ):
-                    relation_definition.target_base_class.incoming_relations[
-                        relation_definition.relation_config.reverse_name
-                    ] = set()
-
                 relation_definition.target_base_class.incoming_relations[
                     relation_definition.relation_config.reverse_name
                 ].add(
@@ -532,13 +632,13 @@ class RelationTo(Sequence):
 
 
 class EmbeddedNode(Sequence):
-    """Defines a RelationTo type annotation, e.g.:
+    """Defines an Embedded Node type annotation, e.g.:
 
     ```
     class Person(BaseNode):
-        owns_pet: RelationTo[Pet, RelationConfig(reverse_name="is_owned_by")]
+        date_of_birth: EmbeddedNode[Date, EmbeddedConfig(validators=[MaxLen(1)])]
     ```
-    The `RelationConfig` is required, and must at least provide a `reverse_name`.
+    The `EmbeddedConfig` is optional (by default, cardinality of an embedded node is 1)
     """
 
     # N.B. We inherit from Sequence so type checker allows us to call len() on this badboy

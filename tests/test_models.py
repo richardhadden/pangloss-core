@@ -404,7 +404,7 @@ def test_incoming_relations():
         purchased_when: datetime.date
 
     class Person(BaseNode):
-        nuns: RelationTo[
+        pets: RelationTo[
             Pet,
             RelationConfig(
                 reverse_name="is_owned_by", relation_model=PersonPetRelation
@@ -415,7 +415,7 @@ def test_incoming_relations():
         pass
 
     class Organisation(BaseNode):
-        nuns: RelationTo[Pet, RelationConfig(reverse_name="is_owned_by")]
+        pets: RelationTo[Pet, RelationConfig(reverse_name="is_owned_by")]
 
     assert len(Pet.incoming_relations) == 1
 
@@ -573,20 +573,85 @@ def test_embedded_trait():
     assert Person.embedded_nodes["purchased_stuff"]
 
 
-def test_reverse_relation_to_embedded():
-    class Source:
+def test_incoming_relations_through_embedded():
+    class Source(BaseNode):
         pass
 
-    class Reference:
-        source: RelationTo[
-            Source, RelationConfig(reverse_name="is_source_of_reference")
-        ]
+    class Ref(BaseNode):
+        page_number: int
+        source: RelationTo[Source, RelationConfig(reverse_name="is_source_of")]
 
-    class Article:
-        reference: EmbeddedNode[Reference]
+    class Article(BaseNode):
+        reference: EmbeddedNode[Ref]
+
+    assert Source.incoming_relations_through_embedded["is_source_of"]
+    is_source_of = Source.incoming_relations_through_embedded["is_source_of"].pop()
+
+    assert is_source_of.target_base_class is Source
+    # assert is_source_of.embedded_base_class is Ref
+    assert is_source_of.origin_base_class is Article
+    assert is_source_of.origin_reference_class.__name__ == "ArticleReference"
+
+
+def test_incoming_relations_through_embedded_rel_to_trait():
+    class Citable(AbstractTrait):
+        pass
+
+    class WrittenSource(BaseNode, Citable):
+        pass
+
+    class ImageSource(BaseNode, Citable):
+        pass
+
+    class Ref(BaseNode):
+        page_number: int
+        source: RelationTo[Citable, RelationConfig(reverse_name="is_source_of")]
+
+    class Article(BaseNode):
+        reference: EmbeddedNode[Ref]
+
+    assert WrittenSource.incoming_relations_through_embedded["is_source_of"]
+    assert ImageSource.incoming_relations_through_embedded["is_source_of"]
+
+
+def test_incoming_relations_through_double_embedded():
+    class Dog(BaseNode):
+        pass
+
+    class Cat(BaseNode):
+        pass
+
+    class InnerEmbedded(BaseNode):
+        dogs: RelationTo[Dog, RelationConfig(reverse_name="dog_has_owner")]
+
+    class Embedded(BaseNode):
+        inner_thing: EmbeddedNode[InnerEmbedded]
+        cats: RelationTo[Cat, RelationConfig(reverse_name="cat_has_owner")]
+
+    class Person(BaseNode):
+        thing: EmbeddedNode[Embedded]
+
+    # assert Dog.incoming_relations_through_embedded == []
+    assert Cat.incoming_relations_through_embedded["cat_has_owner"]
+    cat_has_owner = Cat.incoming_relations_through_embedded["cat_has_owner"].pop()
+    assert cat_has_owner.target_base_class is Cat
+    assert cat_has_owner.origin_base_class is Person
+
+    assert Dog.incoming_relations_through_embedded["dog_has_owner"]
+    dog_has_owner = Dog.incoming_relations_through_embedded["dog_has_owner"].pop()
+
+    assert Dog.incoming_relations_through_embedded["dog_has_owner"] == []
 
 
 # TODO: Embedded traits DONE!
-# TODO: relations to embedded traits...
+# TODO: relations to embedded traits... DONE!
 # TODO: relations to traits DONE!
+# TODO: incoming relations through embedded ... DONE BUT CHECK!
 # TODO: abstract reifications
+
+
+# Seems like it might be possible to have an embedded embedded?
+# Or an embedded to a reification... (how deal w'dat??)
+
+
+# Rename "reification" to "hyperedge"?
