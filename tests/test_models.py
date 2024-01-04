@@ -117,8 +117,8 @@ def test_model_labels():
     class Pet(Animal):
         pass
 
-    assert Animal.__pg_model_labels__ == ["Animal"]
-    assert set(Pet.__pg_model_labels__) == set(["Pet", "Animal"])
+    assert Animal.__pg_get_model_labels__() == ["Animal"]
+    assert set(Pet.__pg_get_model_labels__()) == set(["Pet", "Animal"])
 
 
 def test_traits_are_inherited_directly():
@@ -137,7 +137,7 @@ def test_traits_are_inherited_directly():
     assert "age" in Pet.model_fields
     assert "price" in Pet.model_fields
 
-    assert set(Pet.__pg_model_labels__) == set(["Purchaseable", "Animal", "Pet"])
+    assert set(Pet.__pg_get_model_labels__()) == set(["Purchaseable", "Animal", "Pet"])
 
 
 def test_traits_are_not_inherited_indirectly():
@@ -162,7 +162,7 @@ def test_traits_are_not_inherited_indirectly():
     # But not the price, as we should not inherit from Purchaseable
     assert "price" not in NonPurchaseablePet.model_fields
 
-    assert set(NonPurchaseablePet.__pg_model_labels__) == set(
+    assert set(NonPurchaseablePet.__pg_get_model_labels__()) == set(
         ["NonPurchaseablePet", "Animal", "Pet"]
     )
 
@@ -204,7 +204,7 @@ def test_relation_to():
     maxlen_validator, relation_config, relation_identifier = Person.model_fields[
         "pets"
     ].metadata
-    print("petfieldmetadata", Person.model_fields["pets"])
+
     assert maxlen_validator == MaxLen(2)
     assert relation_config.reverse_name == "is_owned_by"
     assert relation_config.relation_to_base == Pet
@@ -491,8 +491,8 @@ def test_subclass_of_trait():
     class PurchaseableThing(Thing, Purchaseable):
         pass
 
-    assert Purchaseable.__pg_is_subclass_of_trait__
-    assert not PurchaseableThing.__pg_is_subclass_of_trait__
+    assert Purchaseable.__pg_is_subclass_of_trait__()
+    assert not PurchaseableThing.__pg_is_subclass_of_trait__()
 
 
 def test_relation_to_trait():
@@ -574,6 +574,13 @@ def test_embedded_trait():
 
 
 def test_incoming_relations_through_embedded():
+    """
+    Incoming relations for a node should point to the outer node as well as the directly attached node.
+
+    i.e. There is no distinction between Ref and Article (Ref is not *defined* as an embedded node itself),
+    so Source.is_source_of should allow either Ref or Article as a type — Ref could always *not* be embedded...
+    """
+
     class Source(BaseNode):
         pass
 
@@ -584,13 +591,16 @@ def test_incoming_relations_through_embedded():
     class Article(BaseNode):
         reference: EmbeddedNode[Ref]
 
-    assert Source.incoming_relations_through_embedded["is_source_of"]
-    is_source_of = Source.incoming_relations_through_embedded["is_source_of"].pop()
+    assert Source.incoming_relations["is_source_of"]
 
-    assert is_source_of.target_base_class is Source
-    # assert is_source_of.embedded_base_class is Ref
-    assert is_source_of.origin_base_class is Article
-    assert is_source_of.origin_reference_class.__name__ == "ArticleReference"
+    assert len(Source.incoming_relations["is_source_of"]) == 2
+
+    is_source_of_set = Source.incoming_relations["is_source_of"]
+
+    assert {is_source_of.origin_base_class for is_source_of in is_source_of_set} == {
+        Ref,
+        Article,
+    }
 
 
 def test_incoming_relations_through_embedded_rel_to_trait():
@@ -610,8 +620,19 @@ def test_incoming_relations_through_embedded_rel_to_trait():
     class Article(BaseNode):
         reference: EmbeddedNode[Ref]
 
-    assert WrittenSource.incoming_relations_through_embedded["is_source_of"]
-    assert ImageSource.incoming_relations_through_embedded["is_source_of"]
+    assert WrittenSource.incoming_relations["is_source_of"]
+    assert ImageSource.incoming_relations["is_source_of"]
+
+    assert len(WrittenSource.incoming_relations["is_source_of"]) == 2
+    assert len(ImageSource.incoming_relations["is_source_of"]) == 2
+
+    assert {
+        s.origin_base_class for s in WrittenSource.incoming_relations["is_source_of"]
+    } == {Ref, Article}
+
+    assert {
+        s.origin_base_class for s in ImageSource.incoming_relations["is_source_of"]
+    } == {Ref, Article}
 
 
 def test_incoming_relations_through_double_embedded():
@@ -621,32 +642,80 @@ def test_incoming_relations_through_double_embedded():
     class Cat(BaseNode):
         pass
 
-    class InnerEmbedded(BaseNode):
-        dogs: RelationTo[Dog, RelationConfig(reverse_name="dog_has_owner")]
+    class Tortoise(BaseNode):
+        pass
 
-    class Embedded(BaseNode):
-        inner_thing: EmbeddedNode[InnerEmbedded]
+    class DoubleInnerEmbeddedThing(BaseNode):
+        tortoises: RelationTo[
+            Tortoise, RelationConfig(reverse_name="tortoise_has_owner")
+        ]
+
+    class InnerEmbeddedThing(BaseNode):
+        dogs: RelationTo[Dog, RelationConfig(reverse_name="dog_has_owner")]
+        double_inner_thing: EmbeddedNode[DoubleInnerEmbeddedThing]
+
+    class EmbeddedThing(BaseNode):
+        inner_thing: EmbeddedNode[InnerEmbeddedThing]
         cats: RelationTo[Cat, RelationConfig(reverse_name="cat_has_owner")]
 
     class Person(BaseNode):
-        thing: EmbeddedNode[Embedded]
+        thing: EmbeddedNode[EmbeddedThing]
 
-    # assert Dog.incoming_relations_through_embedded == []
-    assert Cat.incoming_relations_through_embedded["cat_has_owner"]
-    cat_has_owner = Cat.incoming_relations_through_embedded["cat_has_owner"].pop()
-    assert cat_has_owner.target_base_class is Cat
-    assert cat_has_owner.origin_base_class is Person
+    assert Cat.incoming_relations["cat_has_owner"]
 
-    assert Dog.incoming_relations_through_embedded["dog_has_owner"]
-    dog_has_owner = Dog.incoming_relations_through_embedded["dog_has_owner"].pop()
+    # Cat should have 2 incoming relations: Person, Embedded
+    assert len(Cat.incoming_relations["cat_has_owner"]) == 2
+    assert {c.origin_base_class for c in Cat.incoming_relations["cat_has_owner"]} == {
+        Person,
+        EmbeddedThing,
+    }
+    assert {c.target_base_class for c in Cat.incoming_relations["cat_has_owner"]} == {
+        Cat
+    }
 
-    assert Dog.incoming_relations_through_embedded["dog_has_owner"] == []
+    assert Dog.incoming_relations["dog_has_owner"]
+
+    # Dog should have 3 incoming relation types: Person, Embedded, InnerEmbedded
+    assert len(Dog.incoming_relations["dog_has_owner"]) == 3
+
+    assert {c.origin_base_class for c in Dog.incoming_relations["dog_has_owner"]} == {
+        Person,
+        EmbeddedThing,
+        InnerEmbeddedThing,
+    }
+
+    assert {
+        c.origin_reference_class.__name__
+        for c in Dog.incoming_relations["dog_has_owner"]
+    } == {
+        Person.Reference.__name__,
+        EmbeddedThing.Reference.__name__,
+        InnerEmbeddedThing.Reference.__name__,
+    }
+
+    assert {c.target_base_class for c in Dog.incoming_relations["dog_has_owner"]} == {
+        Dog
+    }
+
+    assert Tortoise.incoming_relations["tortoise_has_owner"]
+
+    # Tortoise should have 4 incoming relation types: Person, Embedded, InnerEmbedded, DoubleInnerEmbedded
+    assert len(Tortoise.incoming_relations["tortoise_has_owner"]) == 4
+
+    assert {
+        c.origin_base_class for c in Tortoise.incoming_relations["tortoise_has_owner"]
+    } == {
+        Person,
+        EmbeddedThing,
+        InnerEmbeddedThing,
+        DoubleInnerEmbeddedThing,
+    }
 
 
 # TODO: Embedded traits DONE!
 # TODO: relations to embedded traits... DONE!
 # TODO: relations to traits DONE!
-# TODO: incoming relations through embedded ... DONE BUT CHECK!
+# TODO: incoming relations through embedded ... DONE!
 # TODO: abstract reifications
 
 

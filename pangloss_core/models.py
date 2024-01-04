@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import (
     Annotated,
     Any,
+    Callable,
     ClassVar,
     Generic,
     Literal,
@@ -28,6 +29,25 @@ from pydantic.config import ConfigDict
 from typing_extensions import Unpack
 
 from pangloss_core.exceptions import PanglossConfigError
+
+ClassPropertyType = TypeVar("ClassPropertyType")
+
+
+class classproperty(Generic[ClassPropertyType]):
+    """
+    Decorator that converts a method with a single cls argument into a property
+    that can be accessed directly from the class.
+    """
+
+    def __init__(self, method: Callable[[ClassPropertyType], Any]):
+        self.fget = method
+
+    def __get__(self, instance, cls: ClassPropertyType):
+        return self.fget(cls)
+
+    def getter(self, method):
+        self.fget = method
+        return self
 
 
 class CamelModel(pydantic.BaseModel):
@@ -63,17 +83,24 @@ RELATION_IDENTIFIER = "__relation__"
 EMBEDDED_NODE_IDENTIFIER = "__embedded_node__"
 
 
-def __pg_instantiates_abstract_trait__(
+def __pg_model_instantiates_abstract_trait__(
     cls: type[BaseNode] | type[AbstractMixin],
 ) -> bool:
-    return issubclass(cls, AbstractTrait) and cls.__pg_is_subclass_of_trait__
+    """Determines whether a Node model is a direct instantiation of a trait."""
+    return issubclass(cls, AbstractTrait) and cls.__pg_is_subclass_of_trait__()
 
 
 class RelationModel(CamelModel):
+    """Parent class for relationship properties
+
+    TODO: Check types on subclassing, to make sure only viable literals allowed"""
+
     pass
 
 
 class BaseNodeStandardFields(CamelModel):
+    """Class defining the standard fields for all Node models, Node reference models, etc."""
+
     __abstract__ = True
 
     # Standard fields for all Reference types
@@ -82,6 +109,8 @@ class BaseNodeStandardFields(CamelModel):
 
 
 class BaseNodeReference(BaseNodeStandardFields):
+    """Base class for all Node Reference models"""
+
     # TODO: this is producing the option of relation model in JSON schema... It should only be null
     # Maybe should add this as a field on create_relation_model, so it's absent unless we have a relation model
     relation_properties: Optional[RelationModel | type[RelationModel]] = RelationModel()
@@ -93,10 +122,25 @@ class BaseNodeReference(BaseNodeStandardFields):
 
 @dataclass
 class _PG_OutgoingRelationDefinition:
+    """Class containing the definition of an outgoing node:
+
+    - `target_base_class: type[BaseNode]`: the target ("to") class of the relationship
+    - `target_reference_class: type[BaseNodeReference]`: the reference class of the target class
+    - `relation_config: _PG_RelationshipConfigInstantiated`: the configuration model for the relationship
+    - `origin_base_class: type[BaseNode]`: the origin ("from") class of the relationship
+    """
+
     target_base_class: type[BaseNode]
     target_reference_class: type[BaseNodeReference]
     relation_config: _PG_RelationshipConfigInstantiated
     origin_base_class: type[BaseNode]
+
+    def __hash__(self):
+        return hash(
+            repr(self.origin_base_class)
+            + repr(self.target_base_class)
+            + repr(self.relation_config)
+        )
 
 
 @dataclass
@@ -144,10 +188,10 @@ class _PG_EmbeddedNodeDefinition:
 class BaseNode(BaseNodeStandardFields):
     """Base Node should be Abstract by default"""
 
+    __abstract__ = True
+
     def __hash__(self):
         return hash(self.uid)
-
-    __abstract__ = True
 
     Reference: ClassVar[type[BaseNodeReference]]
     outgoing_relations: ClassVar[dict[str, _PG_OutgoingRelationDefinition]]
@@ -185,15 +229,15 @@ class BaseNode(BaseNodeStandardFields):
 
         cls.outgoing_relations = cls.__pg_get_relations_to__()
 
-        cls.incoming_relations_through_embedded: dict[
-            str, set[_PG_IncomingRelationViaEmbeddedDefinition]
-        ] = defaultdict(set)
-        cls.__pg_add_incoming_relations_through_embedded__()
-
         cls.incoming_relations: dict[
             str, set[_PG_IncomingRelationDefinition]
         ] = defaultdict(set)
         cls.__pg_add_incoming_relations_to_related_models__()
+
+        cls.incoming_relations_through_embedded: dict[
+            str, set[_PG_IncomingRelationViaEmbeddedDefinition]
+        ] = defaultdict(set)
+        cls.__pg_add_incoming_relations_through_embedded__()
 
         cls.__pg_add_type_to_trait_list_of_real_types__()
 
@@ -203,8 +247,9 @@ class BaseNode(BaseNodeStandardFields):
 
     @classmethod
     def __pg_add_type_to_trait_list_of_real_types__(cls):
-        for trait in cls.__pg_traits_as_direct_ancestors__:
-            trait.__pg_real_types_with_trait__.add(cls)
+        if issubclass(cls, AbstractTrait):
+            for trait in cls.__pg_get_traits_as_direct_ancestors__():
+                trait.__pg_real_types_with_trait__.add(cls)
 
     @classmethod
     def __pg_run_init_subclass_checks__(cls):
@@ -218,88 +263,145 @@ class BaseNode(BaseNodeStandardFields):
                     f"Field 'relation_properties' (on model {cls.__name__}) is a reserved name. Please rename this field."
                 )
 
+    @staticmethod
+    def __pg_recurse_embeddded_nodes_for_outgoing_types(
+        this_class: type[BaseNode],
+    ) -> set[_PG_OutgoingRelationDefinition]:
+        """Starting from a particular model, work recursively through embedded nodes to find
+        outgoing relationships."""
+        relations = set()
+        for (
+            embedded_field_name,
+            embedded_node_definition,
+        ) in this_class.embedded_nodes.items():
+            for (
+                relation_name,
+                relation_definition,
+            ) in embedded_node_definition.embedded_class.outgoing_relations.items():
+                relations.add(relation_definition)
+                for (
+                    rel
+                ) in embedded_node_definition.embedded_class.__pg_recurse_embeddded_nodes_for_outgoing_types(
+                    embedded_node_definition.embedded_class
+                ):
+                    if not getattr(rel.origin_base_class, "is_embedded_type", False):
+                        relations.add(rel)
+
+        return relations
+
     @classmethod
     def __pg_add_incoming_relations_through_embedded__(cls):
+        # Don't add reverse relations to embedded types! Just the real types...
+        if getattr(cls, "is_embedded_type", False):
+            return
+
         for (
             embedded_field_name,
             embedded_node_definition,
         ) in cls.embedded_nodes.items():
-            if __pg_instantiates_abstract_trait__(
+            # print(embedded_field_name, embedded_node_definition)
+
+            if __pg_model_instantiates_abstract_trait__(
                 embedded_node_definition.embedded_class
             ):
+                """TODO: Here, we need to add this for all types of embedded trait...
+
+                Extract the thing below as function, and iterate over it...
+                """
                 continue
 
+            # For each embedded class's outgoing relations, add the relation to incoming
+            # of the target of the relation
             for (
-                relation_from_embeddded_name,
-                relation_from_embedded_definition,
+                relation_name,
+                relation_definition,
             ) in embedded_node_definition.embedded_class.outgoing_relations.items():
-                if (
-                    issubclass(
-                        relation_from_embedded_definition.target_base_class,
-                        AbstractTrait,
-                    )
-                    and relation_from_embedded_definition.target_base_class.__pg_is_subclass_of_trait__
-                ):
+                # If the target is a trait, add the real versions...
+                if __pg_model_instantiates_abstract_trait__(
+                    relation_definition.target_base_class
+                ) and issubclass(relation_definition.target_base_class, AbstractTrait):
                     for (
                         target_base_class
                     ) in (
-                        relation_from_embedded_definition.target_base_class.__pg_real_types_with_trait__
+                        relation_definition.target_base_class.__pg_real_types_with_trait__
                     ):
-                        target_base_class.incoming_relations_through_embedded[
-                            relation_from_embedded_definition.relation_config.reverse_name
-                        ].add(
-                            _PG_IncomingRelationViaEmbeddedDefinition(
+                        rel_def = _PG_IncomingRelationDefinition(
+                            origin_base_class=cls,
+                            origin_reference_class=cls.Reference,
+                            relation_config=relation_definition.relation_config,
+                            target_base_class=target_base_class,
+                        )
+                        target_base_class.incoming_relations[
+                            relation_definition.relation_config.reverse_name
+                        ].add(rel_def)
+                # Otherwise, just add the class...
+                else:
+                    rel_def = _PG_IncomingRelationDefinition(
+                        origin_base_class=cls,
+                        origin_reference_class=cls.Reference,
+                        relation_config=relation_definition.relation_config,
+                        target_base_class=relation_definition.target_base_class,
+                    )
+
+                    relation_definition.target_base_class.incoming_relations[
+                        relation_definition.relation_config.reverse_name
+                    ].add(rel_def)
+
+                # Now go through all the embedded classes recursively and add these as well
+                incoming_relation_definitions = (
+                    cls.__pg_recurse_embeddded_nodes_for_outgoing_types(cls)
+                )
+
+                for incoming_relation_definition in incoming_relation_definitions:
+                    # If it's a trait, add the real classes
+                    if __pg_model_instantiates_abstract_trait__(
+                        incoming_relation_definition.target_base_class
+                    ) and issubclass(
+                        incoming_relation_definition.target_base_class, AbstractTrait
+                    ):
+                        for (
+                            target_base_class
+                        ) in (
+                            incoming_relation_definition.target_base_class.__pg_real_types_with_trait__
+                        ):
+                            rel_def = _PG_IncomingRelationDefinition(
                                 origin_base_class=cls,
-                                origin_reference_class=cls.__pg_create_reference_class__(
-                                    relation_from_embedded_definition.relation_config.relation_model
-                                ),
-                                # embedded_base_class=relation_from_embedded_definition.origin_base_class,
-                                origin_to_embedded_relation_config=embedded_node_definition.embedded_config,
-                                # embedded_to_target_relation_config=relation_from_embedded_definition.relation_config,
+                                origin_reference_class=cls.Reference,
+                                relation_config=incoming_relation_definition.relation_config,
                                 target_base_class=target_base_class,
                             )
+                            target_base_class.incoming_relations[
+                                incoming_relation_definition.relation_config.reverse_name
+                            ].add(rel_def)
+
+                    # Otherwise, add the actual class
+                    else:
+                        rel_def = _PG_IncomingRelationDefinition(
+                            origin_base_class=cls,
+                            origin_reference_class=cls.Reference,
+                            relation_config=incoming_relation_definition.relation_config,
+                            target_base_class=incoming_relation_definition.target_base_class,
                         )
 
-                else:
-                    relation_from_embedded_definition.target_base_class.incoming_relations_through_embedded[
-                        relation_from_embedded_definition.relation_config.reverse_name
-                    ].add(
-                        _PG_IncomingRelationViaEmbeddedDefinition(
-                            origin_base_class=cls,
-                            origin_reference_class=cls.__pg_create_reference_class__(
-                                relation_from_embedded_definition.relation_config.relation_model
-                            ),
-                            # embedded_base_class=relation_from_embedded_definition.origin_base_class,
-                            origin_to_embedded_relation_config=embedded_node_definition.embedded_config,
-                            # embedded_to_target_relation_config=relation_from_embedded_definition.relation_config,
-                            target_base_class=relation_from_embedded_definition.target_base_class,
+                        incoming_relation_definition.target_base_class.incoming_relations[
+                            incoming_relation_definition.relation_config.reverse_name
+                        ].add(
+                            rel_def
                         )
-                    )
-                    for (
-                        embedded_field_name,
-                        embedded_node_definition,
-                    ) in cls.embedded_nodes.items():
-                        for (
-                            efn,
-                            end,
-                        ) in (
-                            embedded_node_definition.embedded_class.embedded_nodes.items()
-                        ):
-                            ic(cls, end)
 
     @classmethod
     def __pg_add_incoming_relations_to_related_models__(cls):
+        # Don't add embedded node defs as reverse relations
+        if getattr(cls, "is_embedded_type", False):
+            return
+
         for relation_name, relation_definition in cls.__pg_get_relations_to__().items():
             # If reverse relation is to a trait, then we need all the possible instantiating-types
             # of that trait
 
-            # Don't add embedded node defs here, as we do it above
-            if "Embedded" in cls.__name__:
-                return
-
             if (
                 issubclass(relation_definition.target_base_class, AbstractTrait)
-                and relation_definition.target_base_class.__pg_is_subclass_of_trait__
+                and relation_definition.target_base_class.__pg_is_subclass_of_trait__()
             ):
                 for (
                     target_base_class
@@ -312,7 +414,7 @@ class BaseNode(BaseNodeStandardFields):
                         _PG_IncomingRelationDefinition(
                             origin_base_class=cls,
                             origin_reference_class=cls.__pg_create_reference_class__(
-                                target_base_class
+                                relation_definition.relation_config.relation_model
                             ),
                             relation_config=relation_definition.relation_config,
                             target_base_class=target_base_class,
@@ -392,8 +494,7 @@ class BaseNode(BaseNodeStandardFields):
             )
 
     @classmethod
-    @property
-    def __pg_model_labels__(cls) -> list[str]:
+    def __pg_get_model_labels__(cls) -> list[str]:
         """All neo4j labels for model.
 
         Includes direct Trait names."""
@@ -401,13 +502,13 @@ class BaseNode(BaseNodeStandardFields):
             c.__name__
             for c in cls.mro()
             if (issubclass(c, BaseNode) and c is not BaseNode)
-            or c in cls.__pg_traits_as_direct_ancestors__
+            or c in cls.__pg_get_traits_as_direct_ancestors__()
         ]
 
     @classmethod
     def __pg_delete_indirect_trait_fields__(cls) -> None:
         trait_fields_to_delete = set()
-        for trait in cls.__pg_traits_as_indirect_ancestors__:
+        for trait in cls.__pg_get_traits_as_indirect_ancestors__():
             for field_name in cls.model_fields:
                 # AND AND... not in the parent class annotations that is *not* a trait...
                 if (
@@ -420,8 +521,7 @@ class BaseNode(BaseNodeStandardFields):
             del cls.model_fields[field_to_delete]
 
     @classmethod
-    @property
-    def __pg_traits_as_direct_ancestors__(cls) -> set[AbstractTrait]:
+    def __pg_get_traits_as_direct_ancestors__(cls) -> set[AbstractTrait]:
         """Identifies Traits that are directly applied to a model class"""
         traits_as_direct_bases = []
         for base in cls.__bases__:
@@ -435,10 +535,9 @@ class BaseNode(BaseNodeStandardFields):
         return set(traits_as_direct_bases)
 
     @classmethod
-    @property
-    def __pg_traits_as_indirect_ancestors__(cls) -> set[AbstractTrait]:
+    def __pg_get_traits_as_indirect_ancestors__(cls) -> set[AbstractTrait]:
         traits_as_indirect_ancestors = []
-        traits_as_direct_ancestors = cls.__pg_traits_as_direct_ancestors__
+        traits_as_direct_ancestors = cls.__pg_get_traits_as_direct_ancestors__()
         for c in cls.mro():
             if (
                 issubclass(c, AbstractTrait)
@@ -576,7 +675,7 @@ class RelationTo(Sequence):
         validators = relation_config.validators if relation_config.validators else []
 
         concrete_related_types: set[
-            BaseNode
+            type[BaseNode]
         ] = related_type.__pg_real_types_with_trait__
 
         relation_config = _PG_RelationshipConfigInstantiated(
@@ -618,7 +717,7 @@ class RelationTo(Sequence):
 
         if (
             issubclass(related_type, AbstractTrait)
-            and related_type.__pg_is_subclass_of_trait__
+            and related_type.__pg_is_subclass_of_trait__()
         ):
             return cls.__pg_create_annotation_for_relation_to_trait__(
                 related_type=related_type, relation_config=relation_config
@@ -674,6 +773,7 @@ class EmbeddedNode(Sequence):
                     f"{embedded_node_type.__name__}Embedded",
                     __base__=embedded_node_type,
                     real_type=(Literal[embedded_node_type.__name__.lower()], embedded_node_type.__name__.lower()),  # type: ignore
+                    is_embedded_type=(ClassVar[bool], True),
                 )
                 for embedded_node_type in embedded_node_types
             ]
@@ -697,7 +797,7 @@ class EmbeddedNode(Sequence):
         )
 
         concrete_embedded_types: set[
-            BaseNode
+            type[BaseNode]
         ] = embedded_node_type.__pg_real_types_with_trait__
 
         embedded_node_config = _PG_EmbeddedConfigInstantiated(
@@ -721,6 +821,7 @@ class EmbeddedNode(Sequence):
                     f"{concrete_embedded_type.__name__}Embedded",
                     __base__=concrete_embedded_type,
                     real_type=(Literal[concrete_embedded_type.__name__.lower()], concrete_embedded_type.__name__.lower()),  # type: ignore
+                    is_embedded_type=(ClassVar[bool], True),
                 )
             )
 
@@ -763,7 +864,7 @@ class EmbeddedNode(Sequence):
 
         if (
             issubclass(embedded_node_type, AbstractTrait)
-            and embedded_node_type.__pg_is_subclass_of_trait__
+            and embedded_node_type.__pg_is_subclass_of_trait__()
         ):
             return cls.__pg_create_annotation_for_embedded_trait__(
                 embedded_node_type=embedded_node_type,
@@ -819,10 +920,9 @@ class EmbeddedNode(Sequence):
 
 
 class AbstractTrait:
-    __pg_real_types_with_trait__: set
+    __pg_real_types_with_trait__: set[type[BaseNode]]
 
     @classmethod
-    @property
     def __pg_is_subclass_of_trait__(cls):
         """Determine whether a class is a subclass of AbstractTrait,
         not the application of a trait to a real BaseNode class.
