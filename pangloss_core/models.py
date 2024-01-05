@@ -2,23 +2,12 @@ from __future__ import annotations
 
 import inspect
 import typing
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from dataclasses import asdict, dataclass
 from functools import lru_cache
-from typing import (
-    Annotated,
-    Any,
-    Callable,
-    ClassVar,
-    Generic,
-    Literal,
-    NewType,
-    Optional,
-    Self,
-    Sequence,
-    TypeVar,
-    Union,
-)
+from types import UnionType
+from typing import (Annotated, Any, Callable, ClassVar, Generic, Literal,
+                    NewType, Optional, Self, Sequence, TypeVar, Union)
 from uuid import UUID, uuid4
 
 import humps
@@ -81,6 +70,7 @@ ModelManager = ModelManagerClass()
 
 RELATION_IDENTIFIER = "__relation__"
 EMBEDDED_NODE_IDENTIFIER = "__embedded_node__"
+REIFIED_RELATION_IDENTIFIER = "__reified_relation__"
 
 
 def __pg_model_instantiates_abstract_trait__(
@@ -227,7 +217,10 @@ class BaseNode(BaseNodeStandardFields):
         cls.Reference = cls.__pg_create_reference_class__()
         cls.embedded_nodes = cls.__pg_get_embedded_nodes__()
 
-        cls.outgoing_relations = cls.__pg_get_relations_to__()
+        cls.outgoing_relations = {
+            **cls.__pg_get_relations_to__(),
+            **cls.__pg_get_reified_relations_to__(),
+        }
 
         cls.incoming_relations: dict[
             str, set[_PG_IncomingRelationDefinition]
@@ -434,6 +427,29 @@ class BaseNode(BaseNodeStandardFields):
                         target_base_class=relation_definition.target_base_class,
                     )
                 )
+
+    @classmethod
+    def __pg_get_reified_relations_to__(
+        cls,
+    ) -> dict[str, _PG_OutgoingRelationDefinition]:
+        relations_to = {}
+        for field_name, field in cls.model_fields.items():
+            if REIFIED_RELATION_IDENTIFIER in field.metadata:
+                relation_config: _PG_RelationshipConfigInstantiated = [
+                    item
+                    for item in field.metadata
+                    if isinstance(item, _PG_RelationshipConfigInstantiated)
+                ][0]
+                # print(relation_config)
+
+                relations_to[field_name] = _PG_OutgoingRelationDefinition(
+                    target_base_class=relation_config.relation_to_base,
+                    target_reference_class=relation_config.relation_to_base.Reference,
+                    relation_config=relation_config,
+                    origin_base_class=cls,
+                )
+
+        return relations_to
 
     @classmethod
     def __pg_get_relations_to__(cls) -> dict[str, _PG_OutgoingRelationDefinition]:
@@ -943,41 +959,96 @@ class AbstractMixin(CamelModel):
     pass
 
 
-"""
-class Purchaseable(AbstractTrait):
-    price: int
-
-class ColourMixin(AbstractMixin):
-    colour: str
-
-class Vegetable(BaseNode, Purchaseable, ColourMixin):
-    name: str
-    weight: int
+ReificationType = TypeVar("ReificationType", BaseNode, BaseNode)
 
 
-    
-class NonPurchaseableVegetable(Vegetable, ColourMixin):
+class ReifiedRelation(BaseNode):
+    is_reified_relation_type: ClassVar[bool] = True
+    target: Any
+
+    @classmethod
+    def __pydantic_init_subclass__(cls) -> None:
+        # Reifications don't need labels!
+        # TODO: unless, label is a manually-added field
+        del cls.model_fields["label"]
+        cls.model_rebuild(force=True)
+        super().__pydantic_init_subclass__()
+        cls.model_rebuild(force=True)
+
+    def __class_getitem__(
+        cls,
+        args: tuple[type[ReificationType], TargetRelationConfig, ReifiedRelationConfig]
+        | tuple[type[ReificationType], ReifiedRelationConfig, TargetRelationConfig],
+    ) -> type[Self]:
+        try:
+            target_class = args[0]
+        except:
+            raise PanglossConfigError(
+                f"A target BaseNode type must be provided to ReifiedRelation '{cls.__name__}'"
+            )
+
+        if not issubclass(target_class, BaseNode):
+            raise PanglossConfigError(
+                f"A target BaseNode type must be provided to ReifiedRelation '{cls.__name__}', not {type(target_class)}"
+            )
+
+        try:
+            target_relation_config = [
+                arg for arg in args if isinstance(arg, TargetRelationConfig)
+            ][0]
+        except:
+            raise PanglossConfigError(
+                f"A TargetRelationConfig must be provided to ReifiedRelation '{cls.__name__}'"
+            )
+
+        try:
+            reified_relation_config = [
+                arg for arg in args if isinstance(arg, ReifiedRelationConfig)
+            ][0]
+        except:
+            reified_relation_config = ReifiedRelationConfig(
+                reverse_name=f"is_{target_class.__name__.lower()}_{cls.__name__.lower()}"
+            )
+
+        new_model = pydantic.create_model(
+            f"{target_class.__name__}{cls.__name__}",
+            __base__=cls,
+            target=(
+                RelationTo[target_class, target_relation_config],
+                ...,
+            ),
+        )
+
+        return Annotated[
+            set[new_model],
+            _PG_RelationshipConfigInstantiated(
+                reverse_name=f"is_target_of_{target_class.__name__.lower()}_{cls.__name__.lower()}",
+                relation_to_base=new_model,
+                validators=reified_relation_config.validators,
+                relation_model=reified_relation_config.relation_model,
+            ),
+            REIFIED_RELATION_IDENTIFIER,
+        ]
+
+
+class TargetRelationConfig(RelationConfig):
     pass
 
-class AnotherNonPurchaseableVeg(NonPurchaseableVegetable):
-    pass
 
-class Person(BaseNode):
-    owns_vegetable: RelationTo[Vegetable, RelationConfig(reverse_name="is_owned_by", validators=[MaxLen(1)])]
+@dataclass
+class ReifiedRelationConfig:
+    """Provides configuration for relation between a `BaseNode` a `ReifiedRelation` node type, e.g.:
 
-"""
-"""
-ic(Vegetable.model_fields)
-ic(Vegetable.model_json_schema())
-ic(NonPurchaseableVegetable.model_fields)
-ic(NonPurchaseableVegetable.model_json_schema())
+    ```
+    class Person:
+        pets: RelationTo[
+            Pet,
+            ReifiedRelationConfig(validators=[MaxLen(2)]),
+            TargetRelationConfig(reverse_name="owned_by"),
+        ]
+    ```
+    """
 
-ic(Vegetable.__pros_model_labels__)
-ic(NonPurchaseableVegetable.__pros_model_labels__)
-
-npv = NonPurchaseableVegetable(uid="something", label="something", name="Swede", weight=100, colour="blue")
-ic(npv.model_dump())
-"""
-
-# ic(Person.model_fields)
-# ic(Person.model_json_schema())
+    reverse_name: str
+    relation_model: Optional[type[RelationModel]] = None
+    validators: Optional[Sequence[BaseMetadata]] = None

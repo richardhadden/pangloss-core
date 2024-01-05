@@ -15,9 +15,12 @@ from pangloss_core.models import (
     EmbeddedConfig,
     EmbeddedNode,
     ModelManager,
+    ReifiedRelation,
+    ReifiedRelationConfig,
     RelationConfig,
     RelationModel,
     RelationTo,
+    TargetRelationConfig,
 )
 
 
@@ -710,6 +713,117 @@ def test_incoming_relations_through_double_embedded():
         InnerEmbeddedThing,
         DoubleInnerEmbeddedThing,
     }
+
+
+def test_reified_relationship_setup_without_target_relation_config():
+    class IdentificationIdentifiedEntityRelation(RelationModel):
+        certainty: int
+
+    class Identification(ReifiedRelation):
+        pass
+
+    class Person(BaseNode):
+        name: str
+
+    with pytest.raises(PanglossConfigError):
+
+        class Event(BaseNode):
+            person_identified: Identification[Person,]
+
+
+def test_reified_relationship_setup_with_target_relation_config():
+    class IdentificationIdentifiedEntityRelation(RelationModel):
+        certainty: int
+
+    class Identification(ReifiedRelation):
+        pass
+
+    class Person(BaseNode):
+        name: str
+
+    class Event(BaseNode):
+        person_identified: Identification[
+            Person, TargetRelationConfig(reverse_name="is_identified_in_event")
+        ]
+
+    assert (
+        Event.outgoing_relations["person_identified"]
+        .target_base_class.outgoing_relations["target"]
+        .target_base_class
+        is Person
+    )
+
+    assert (
+        Event.outgoing_relations["person_identified"]
+        .target_base_class.outgoing_relations["target"]
+        .target_reference_class.__name__
+        == "PersonReference"
+    )
+
+
+def test_reified_relationship_setup_with_target_and_reified_relation_config():
+    class IdentificationIdentifiedEntityRelation(RelationModel):
+        certainty: int
+
+    class Identification(ReifiedRelation):
+        pass
+
+    class Person(BaseNode):
+        name: str
+
+    class Event(BaseNode):
+        person_identified: Identification[
+            Person,
+            ReifiedRelationConfig(reverse_name="is_identification_of_person_in_event"),
+            TargetRelationConfig(reverse_name="is_identified_in"),
+        ]
+
+
+def test_reified_relation_init_works():
+    class IdentificationIdentifiedEntityRelation(RelationModel):
+        certainty: int
+
+    class Identification(ReifiedRelation):
+        pass
+
+    class Person(BaseNode):
+        name: str
+
+    class Event(BaseNode):
+        person_identified: Identification[
+            Person,
+            ReifiedRelationConfig(
+                reverse_name="is_identification_of_person_in_event",
+            ),
+            TargetRelationConfig(
+                reverse_name="is_identified_in",
+                relation_model=IdentificationIdentifiedEntityRelation,
+            ),
+        ]
+
+    event = Event(
+        label="Big Bash",
+        uid=uuid4(),
+        person_identified=[
+            {
+                "target": [
+                    dict(
+                        label="JohnSmith",
+                        uid=uuid4(),
+                        real_type="person",
+                        relation_data=dict(certainty=1),
+                    )
+                ],
+            }
+        ],
+    )
+
+    person_identified = event.person_identified.pop()
+    target = person_identified.target.pop()
+    assert target.label == "JohnSmith"
+    assert target.relation_data.certainty == 1
+
+    # assert event.person_identified[0].target == []
 
 
 # TODO: Embedded traits DONE!
