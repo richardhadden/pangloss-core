@@ -175,6 +175,22 @@ class _PG_EmbeddedNodeDefinition:
     embedded_config: _PG_EmbeddedConfigInstantiated
 
 
+def _pg_get_concrete_node_classes(classes):
+    concrete_node_classes = []
+    if unpacked_classes := typing.get_args(classes):
+        for cl in unpacked_classes:
+            concrete_node_classes += list(_pg_get_concrete_node_classes(cl))
+            
+    elif issubclass(classes, AbstractTrait) and __pg_model_instantiates_abstract_trait__(classes):
+        for cl in classes.__pg_real_types_with_trait__:
+            concrete_node_classes += list(_pg_get_concrete_node_classes(cl))
+
+    else:  # Classes is a single class
+        concrete_node_classes.append(classes)
+
+    return set(concrete_node_classes)
+
+
 class BaseNode(BaseNodeStandardFields):
     """Base Node should be Abstract by default"""
 
@@ -387,6 +403,14 @@ class BaseNode(BaseNodeStandardFields):
         # Don't add embedded node defs as reverse relations
         if getattr(cls, "is_embedded_type", False):
             return
+        print("=====")
+        print(cls.__name__)
+        print("-----")
+        for (
+            relation_name,
+            relation_definition,
+        ) in cls.__pg_get_reified_relations_to__().items():
+            print(relation_definition)
 
         for relation_name, relation_definition in cls.__pg_get_relations_to__().items():
             # If reverse relation is to a trait, then we need all the possible instantiating-types
@@ -963,7 +987,6 @@ ReificationType = TypeVar("ReificationType", BaseNode, BaseNode)
 
 
 class ReifiedRelation(BaseNode):
-    is_reified_relation_type: ClassVar[bool] = True
     target: Any
 
     @classmethod
@@ -1017,6 +1040,7 @@ class ReifiedRelation(BaseNode):
                 RelationTo[target_class, target_relation_config],
                 ...,
             ),
+            is_reified_relation_type=(ClassVar[bool], True),
         )
 
         return Annotated[

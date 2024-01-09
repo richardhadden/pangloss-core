@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import typing
 from uuid import uuid4
 
 import pytest
@@ -21,6 +22,7 @@ from pangloss_core.models import (
     RelationModel,
     RelationTo,
     TargetRelationConfig,
+    _pg_get_concrete_node_classes,
 )
 
 
@@ -823,7 +825,64 @@ def test_reified_relation_init_works():
     assert target.label == "JohnSmith"
     assert target.relation_data.certainty == 1
 
-    # assert event.person_identified[0].target == []
+
+"""
+def test_reverse_relation_to_reified():
+    class IdentificationIdentifiedEntityRelation(RelationModel):
+        certainty: int
+
+    class Identification(ReifiedRelation):
+        pass
+
+    class Person(BaseNode):
+        name: str
+
+    class Event(BaseNode):
+        person_hosting: Identification[
+            Person,
+            ReifiedRelationConfig(
+                reverse_name="is_identification_of_person_in_event",
+            ),
+            TargetRelationConfig(
+                reverse_name="hosted_event",
+                relation_model=IdentificationIdentifiedEntityRelation,
+            ),
+        ]
+
+    assert Person.incoming_relations == {}
+"""
+
+
+def test_get_concrete_node_classes():
+    class Person(BaseNode):
+        pass
+
+    class Other(BaseNode):
+        pass
+
+    class Purchaseable(AbstractTrait):
+        pass
+
+    class Dog(BaseNode, Purchaseable):
+        pass
+
+    class Cat(BaseNode, Purchaseable):
+        pass
+
+    class SmallNonPurchaseableCat(Cat):
+        pass
+
+    assert _pg_get_concrete_node_classes(Person) == {Person}
+
+    assert _pg_get_concrete_node_classes(typing.Union[Person, Other]) == {Person, Other}
+
+    assert _pg_get_concrete_node_classes(Purchaseable) == {Dog, Cat}
+
+    assert _pg_get_concrete_node_classes(typing.Union[Person, Purchaseable]) == {
+        Person,
+        Dog,
+        Cat,
+    }
 
 
 # TODO: Embedded traits DONE!
@@ -831,6 +890,7 @@ def test_reified_relation_init_works():
 # TODO: relations to traits DONE!
 # TODO: incoming relations through embedded ... DONE!
 # TODO: abstract reifications
+# TODO: overrideable relation types...
 
 
 # Seems like it might be possible to have an embedded embedded?
