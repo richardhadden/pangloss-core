@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "pangloss-core-new"
+version = "0.1.0"
+description = ""
+authors = ["Richard Hadden <richard.hadden@oeaw.ac.at>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pydantic = "^2.6.1"
+pyhumps = "^3.8.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
