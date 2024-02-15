@@ -8,6 +8,7 @@ from pangloss_core_new.model_setup.config_definitions import (
 )
 from pangloss_core_new.model_setup.models_base import BaseNodeStandardFields, CamelModel
 from pangloss_core_new.model_setup.subnode_proxy import SubNodeProxy
+from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
 
 
 class EmbeddedNodeBase(SubNodeProxy):
@@ -60,6 +61,7 @@ class AbstractBaseNode(BaseNodeStandardFields):
     View: typing.ClassVar[type["ViewNodeBase"]]
     Embedded: typing.ClassVar[type["EmbeddedNodeBase"]]
     Edit: typing.ClassVar[type["EditNodeBase"]]
+    Reference: typing.ClassVar[type["BaseNodeReference"]]
 
     embedded_nodes: typing.ClassVar[dict[str, _EmbeddedNodeDefinition]]
     embedded_nodes_instantiated: typing.ClassVar[bool] = False

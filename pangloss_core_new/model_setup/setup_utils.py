@@ -329,22 +329,39 @@ def __setup_build_expanded_relation_annotation_type__(
     )
 
 
-def __setup_create_reference_class__(
-    cls: type[AbstractBaseNode],
-    relation_name: str,
-    origin_class_name: str,
-    relation_properties_model: type[RelationPropertiesModel] | None = None,
-) -> type[BaseNodeReference]:
-    if not relation_properties_model:
-        return pydantic.create_model(
-            f"{origin_class_name}__{relation_name}__{cls.__name__}_Reference",
-            __base__=BaseNodeReference,
+def __setup_initialise_reference_class__(cls):
+    if getattr(cls, "Reference", None):
+        cls.Reference = pydantic.create_model(
+            f"{cls.__name__}Reference",
+            __base__=cls.Reference,
+            base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
             real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
         )
     else:
-        return pydantic.create_model(
-            f"{origin_class_name}__{relation_name}__{cls.__name__}_Reference",
+        cls.Reference = pydantic.create_model(
+            f"{cls.__name__}Reference",
             __base__=BaseNodeReference,
+            base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
+            real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+        )
+
+
+def __setup_create_reference_class__(
+    cls: type[AbstractBaseNode],
+    relation_name: str | None = None,
+    origin_class_name: str | None = None,
+    relation_properties_model: type[RelationPropertiesModel] | None = None,
+) -> type[BaseNodeReference]:
+    if not getattr(cls, "Reference", None) or not cls.Reference.base_class == cls:
+        __setup_initialise_reference_class__(cls)
+    print(cls.Reference)
+    if not relation_properties_model:
+        return cls.Reference
+    else:
+        return pydantic.create_model(
+            f"{origin_class_name}__{relation_name}__{cls.__name__}Reference",
+            __base__=BaseNodeReference,
+            base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
             real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
             relation_properties=(relation_properties_model, ...),
         )

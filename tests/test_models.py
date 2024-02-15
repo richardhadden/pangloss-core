@@ -133,11 +133,70 @@ def test_non_heritable_mixins_are_not_inherited_indirectly():
     )
 
 
+def test_traits_keep_track_of_their_real_classes():
+    class Purchaseable(BaseNonHeritableMixin):
+        price: int
+
+    class CheaplyPurchaseable(Purchaseable):
+        pass
+
+    class Punchable(BaseNonHeritableMixin):
+        pass
+
+    class Thing(BaseNode):
+        pass
+
+    class PurchaseableThing(Thing, Purchaseable):
+        pass
+
+    class Politician(BaseNode, Purchaseable, Punchable):
+        pass
+
+    class NonPurchaseablePolitician(Politician):
+        pass
+
+    class CheaplyPurchaseableThing(Thing, CheaplyPurchaseable):
+        pass
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Purchaseable.__pg_real_types_with_trait__ == set(
+        [PurchaseableThing, Politician]
+    )
+
+    assert Punchable.__pg_real_types_with_trait__ == set([Politician])
+
+    assert CheaplyPurchaseable.__pg_real_types_with_trait__ == set(
+        [CheaplyPurchaseableThing]
+    )
+
+
 def test_embedded_cannot_be_in_model_name():
     with pytest.raises(PanglossConfigError):
 
         class EmbeddedSomething(BaseNode):
             pass
+
+
+def test_embedded_does_not_need_to_be_wrapped_in_annotated():
+    import datetime
+
+    class DateBase(BaseNode):
+        __abstract__ = True
+
+    class DatePrecise(DateBase):
+        date_precise: datetime.date
+
+    class DateImprecise(DateBase):
+        date_not_before: datetime.date
+        date_not_after: datetime.date
+
+    class Person(BaseNode):
+        date_of_birth: Embedded[DateBase]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Person.embedded_nodes["date_of_birth"].embedded_class == DateBase
 
 
 def test_embedded_model_tracks_base_class():
@@ -284,16 +343,16 @@ def test_model_relation_construction():
         for cl in typing.get_args(
             typing.get_args(Person.model_fields["pets"].annotation)[0]
         )
-    ) == {"Person__pets__Pet_Reference", "Person__pets__Crocodile_Reference"}
+    ) == {"PetReference", "CrocodileReference"}
 
     schema = Person.model_json_schema()
 
-    assert {"$ref": "#/$defs/Person__pets__Pet_Reference"} in schema["properties"][
-        "pets"
-    ]["items"]["anyOf"]
-    assert {"$ref": "#/$defs/Person__pets__Crocodile_Reference"} in schema[
-        "properties"
-    ]["pets"]["items"]["anyOf"]
+    assert {"$ref": "#/$defs/PetReference"} in schema["properties"]["pets"]["items"][
+        "anyOf"
+    ]
+    assert {"$ref": "#/$defs/CrocodileReference"} in schema["properties"]["pets"][
+        "items"
+    ]["anyOf"]
 
 
 def test_relation_to():
@@ -319,7 +378,7 @@ def test_relation_to():
     assert {
         arg.__name__
         for arg in Person.model_fields["pets"].annotation.__args__[0].__args__
-    } == {"Person__pets__Pet_Reference", "Person__pets__Crocodile_Reference"}
+    } == {"PetReference", "CrocodileReference"}
 
     # Test that that abstract Reptile is not included by
     # making sure that the length is only 2 (i.e. the above two)
@@ -333,12 +392,12 @@ def test_relation_to():
 
     schema = Person.model_json_schema()
 
-    assert {"$ref": "#/$defs/Person__pets__Pet_Reference"} in schema["properties"][
-        "pets"
-    ]["items"]["anyOf"]
-    assert {"$ref": "#/$defs/Person__pets__Crocodile_Reference"} in schema[
-        "properties"
-    ]["pets"]["items"]["anyOf"]
+    assert {"$ref": "#/$defs/PetReference"} in schema["properties"]["pets"]["items"][
+        "anyOf"
+    ]
+    assert {"$ref": "#/$defs/CrocodileReference"} in schema["properties"]["pets"][
+        "items"
+    ]["anyOf"]
 
     # Test that that abstract Reptile is not included by
     # making sure that the length is only 2 (i.e. the above two)
@@ -412,12 +471,73 @@ def test_reference_model_on_relation():
     assert len(p.pets) == 2
     mf, ms = sorted(list(p.pets), key=lambda p: p.label)
 
-    assert type(mf).__name__ == "Person__pets__Pet_Reference"
+    assert type(mf).__name__ == "Person__pets__PetReference"
 
     assert mf.label == "Mr Frisky"
 
     assert mf.relation_properties.cost_of_purchase == 200
 
-    assert type(ms).__name__ == "Person__pets__Crocodile_Reference"
+    assert type(ms).__name__ == "Person__pets__CrocodileReference"
     assert ms.label == "Mr Snappy"
     assert ms.relation_properties.cost_of_purchase == 300
+
+
+def test_relation_to_trait():
+    class Purchaseable(BaseNonHeritableMixin):
+        price: int
+
+    class Thing(BaseNode):
+        pass
+
+    class PurchaseableThing(Thing, Purchaseable):
+        pass
+
+    class OtherPurchaseableThing(Thing, Purchaseable):
+        pass
+
+    class Pet(BaseNode):
+        pass
+
+    class Person(BaseNode):
+        purchased_stuff: typing.Annotated[
+            RelationTo[Purchaseable], RelationConfig(reverse_name="purchased_by")
+        ]
+        pets: typing.Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_owned_by")
+        ]
+
+    class Organisation(BaseNode):
+        purchased_stuff: typing.Annotated[
+            RelationTo[Purchaseable], RelationConfig(reverse_name="purchased_by")
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert set(
+        [
+            m.__name__
+            for m in Person.model_fields["purchased_stuff"]
+            .annotation.__args__[0]
+            .__args__
+        ]
+    ) == set(["OtherPurchaseableThingReference", "PurchaseableThingReference"])
+
+    assert (
+        Person.outgoing_relations["purchased_stuff"].target_base_class == Purchaseable
+    )
+    """TODO: add in once incoming rels are done
+    assert len(PurchaseableThing.incoming_relations) == 1
+    assert len(OtherPurchaseableThing.incoming_relations) == 1
+
+    assert len(PurchaseableThing.incoming_relations["purchased_by"]) == 2
+    assert {
+        rel_def.origin_base_class
+        for rel_def in PurchaseableThing.incoming_relations["purchased_by"]
+    } == {Person, Organisation}
+
+    assert len(OtherPurchaseableThing.incoming_relations["purchased_by"]) == 2
+    assert {
+        rel_def.origin_base_class
+        for rel_def in OtherPurchaseableThing.incoming_relations["purchased_by"]
+    } == {Person, Organisation}
+    """

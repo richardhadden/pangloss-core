@@ -3,6 +3,7 @@ from pangloss_core_new.model_setup.setup_utils import (
     __setup_delete_indirect_non_heritable_mixin_fields__,
     __setup_update_embedded_definitions__,
     __setup_update_relation_annotations__,
+    __setup_initialise_reference_class__,
 )
 
 
@@ -20,6 +21,8 @@ class ModelManager:
     @classmethod
     def initialise_models(cls, depth=2):
         for subclass in cls._registered_models:
+            print("Initialising", subclass.__name__)
+
             __setup_delete_indirect_non_heritable_mixin_fields__(subclass)
             subclass.model_rebuild(force=True, _parent_namespace_depth=depth)
 
