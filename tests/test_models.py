@@ -8,11 +8,11 @@ import pytest
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.base_node_definitions import (
     BaseNonHeritableMixin,
-    RelationPropertiesModel,
 )
 from pangloss_core_new.model_setup.config_definitions import (
     EmbeddedConfig,
     RelationConfig,
+    RelationPropertiesModel,
 )
 from pangloss_core_new.model_setup.embedded import Embedded
 from pangloss_core_new.model_setup.model_manager import ModelManager

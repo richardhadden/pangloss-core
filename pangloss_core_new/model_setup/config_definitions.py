@@ -34,7 +34,7 @@ class RelationConfig:
     """
 
     reverse_name: str
-    relation_model: typing.Optional[type[RelationPropertiesModel]] = None
+    relation_model: typing.Optional[type["RelationPropertiesModel"]] = None
     validators: typing.Optional[typing.Sequence[annotated_types.BaseMetadata]] = None
     subclasses_relation: typing.Optional[str] = None
     create_inline: bool = False
