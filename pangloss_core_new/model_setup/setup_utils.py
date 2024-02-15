@@ -16,6 +16,9 @@ from pangloss_core_new.model_setup.config_definitions import (
     EmbeddedConfig,
     _EmbeddedConfigInstantiated,
     _EmbeddedNodeDefinition,
+    _RelationConfigInstantiated,
+    _OutgoingRelationDefinition,
+    RelationConfig,
 )
 from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
 from pangloss_core_new.model_setup.relation_properties_model import (
@@ -112,7 +115,7 @@ def __pg_create_embedded_class__(cls: type[AbstractBaseNode]) -> type[EmbeddedNo
     return embedded_class
 
 
-def __pg_update_embedded_definitions__(cls: type[AbstractBaseNode]) -> None:
+def __setup_update_embedded_definitions__(cls: type[AbstractBaseNode]) -> None:
     if cls.embedded_nodes_instantiated:
         return
 
@@ -211,7 +214,7 @@ def __pg_build_embedded_annotation_type__(
     for concrete_embedded_type in _get_concrete_node_classes(
         embedded_node_type, include_subclasses=True
     ):
-        __pg_update_embedded_definitions__(concrete_embedded_type)
+        __setup_update_embedded_definitions__(concrete_embedded_type)
 
         new_embedded_model = __pg_create_embedded_class__(concrete_embedded_type)
 
@@ -228,20 +231,152 @@ def __pg_build_embedded_annotation_type__(
     )
 
 
-def __pg_create_reference_class__(
+def __setup_update_relation_annotations__(cls: type["AbstractBaseNode"]):
+    for field_name, field in cls.model_fields.items():
+        # Relation fields can be defined as either a typing.Annotated (including metadata)
+
+        field.annotation = field.rebuild_annotation()
+
+        if (
+            typing.get_args(field.annotation)
+            and getattr(typing.get_args(field.annotation)[0], "__name__", False)
+            == "RelationTo"
+        ):
+            relation_wrapper, *other_annotations = typing.get_args(field.annotation)
+            related_base_type: type["AbstractBaseNode"] = relation_wrapper.__args__[0]
+
+            try:
+                relation_config: RelationConfig = [
+                    item
+                    for item in other_annotations
+                    if isinstance(item, RelationConfig)
+                ][0]
+                other_annotations = [
+                    item
+                    for item in other_annotations
+                    if not isinstance(item, RelationConfig)
+                ]
+            except IndexError:
+                raise PanglossConfigError(
+                    f"{cls.__name__}.{field_name} is missing a RelationConfig object)"
+                )
+
+            (
+                annotation,
+                updated_config,
+            ) = __setup_build_expanded_relation_annotation_type__(
+                related_model=related_base_type,
+                relation_config=relation_config,
+                other_annotations=other_annotations,
+                origin_class_name=cls.__name__,
+                relation_name=field_name,
+            )
+            cls.model_fields[field_name] = pydantic.fields.FieldInfo(
+                annotation=annotation
+            )
+
+            cls.outgoing_relations[field_name] = _OutgoingRelationDefinition(
+                target_base_class=updated_config.relation_to_base,
+                target_reference_class=updated_config.relation_to_base,  # type: ignore
+                relation_config=updated_config,
+                origin_base_class=cls,
+            )
+
+
+def __setup_build_expanded_relation_annotation_type__(
+    related_model: type[AbstractBaseNode],
+    relation_config: RelationConfig,
+    other_annotations: list[typing.Any],
+    relation_name: str,
+    origin_class_name: str,
+) -> tuple[typing.Any, _RelationConfigInstantiated]:
+    """Expands an annotation to include subclasses/classes from AbstractTrait, etc."""
+
+    validators = relation_config.validators if relation_config.validators else []
+
+    concrete_related_types = _get_concrete_node_classes(
+        related_model, include_subclasses=True
+    )
+
+    all_related_types = []
+    instantiated_relation_config = _RelationConfigInstantiated(
+        relation_to_base=related_model,
+        **dataclasses.asdict(relation_config),  # type: ignore
+    )
+    for concrete_related_type in concrete_related_types:
+        if relation_config.create_inline:
+            all_related_types.append(concrete_related_type)
+        else:
+            all_related_types.append(
+                __setup_create_reference_class__(
+                    concrete_related_type,
+                    relation_name,
+                    origin_class_name,
+                    relation_properties_model=instantiated_relation_config.relation_model,
+                )
+            )
+
+    all_related_types = tuple(all_related_types)
+
+    return (
+        typing.Annotated[
+            list[typing.Union[*all_related_types]],  # type: ignore
+            *validators,
+            *other_annotations,
+            instantiated_relation_config,
+        ],
+        instantiated_relation_config,
+    )
+
+
+def __setup_create_reference_class__(
     cls: type[AbstractBaseNode],
+    relation_name: str,
+    origin_class_name: str,
     relation_properties_model: type[RelationPropertiesModel] | None = None,
 ) -> type[BaseNodeReference]:
     if not relation_properties_model:
         return pydantic.create_model(
-            f"{cls.__name__}Reference",
+            f"{origin_class_name}__{relation_name}__{cls.__name__}_Reference",
             __base__=BaseNodeReference,
             real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
         )
     else:
         return pydantic.create_model(
-            f"{relation_properties_model.__name__}_{cls.__name__}Reference",
+            f"{origin_class_name}__{relation_name}__{cls.__name__}_Reference",
             __base__=BaseNodeReference,
             real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
             relation_properties=(relation_properties_model, ...),
+        )
+
+
+def __setup_delete_indirect_non_heritable_mixin_fields__(
+    cls: type[AbstractBaseNode],
+) -> None:
+    trait_fields_to_delete = set()
+    for trait in cls.__pg_get_non_heritable_mixins_as_indirect_ancestors__():
+        for field_name in cls.model_fields:
+            # AND AND... not in the parent class annotations that is *not* a trait...
+            if field_name in trait.__annotations__ and trait not in cls.__annotations__:
+                trait_fields_to_delete.add(field_name)
+    for td in trait_fields_to_delete:
+        del cls.model_fields[td]
+
+
+def __setup_run_init_subclass_checks__(cls: type[AbstractBaseNode]):
+    """Run checks on subclasses for validity, following rules below.
+
+    1. Cannot have field named `relation_properties` as this is used internally
+    2. Cannot have 'Embedded' in class name"""
+    print(cls)
+    for field_name, field in cls.model_fields.items():
+        if field_name == "relation_properties":
+            raise PanglossConfigError(
+                f"Field 'relation_properties' (on model {cls.__name__}) is a reserved name. Please rename this field."
+            )
+
+    if "Embedded" in cls.__name__:
+        raise PanglossConfigError(
+            f"Base models cannot use 'Embedded' as part of the name, as this is used "
+            f"internally. (Model '{cls.__name__}' should be renamed)"
         )

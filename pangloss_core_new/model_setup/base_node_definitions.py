@@ -1,11 +1,12 @@
 import inspect
 import typing
 
+from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.config_definitions import (
     _EmbeddedNodeDefinition,
-    _PG_OutgoingRelationDefinition,
+    _OutgoingRelationDefinition,
 )
-from pangloss_core_new.model_setup.models_base import BaseNodeStandardFields
+from pangloss_core_new.model_setup.models_base import BaseNodeStandardFields, CamelModel
 from pangloss_core_new.model_setup.subnode_proxy import SubNodeProxy
 
 
@@ -45,6 +46,14 @@ class BaseMixin:
     pass
 
 
+class RelationPropertiesModel(CamelModel):
+    """Parent class for relationship properties
+
+    TODO: Check types on subclassing, to make sure only viable literals allowed"""
+
+    pass
+
+
 class AbstractBaseNode(BaseNodeStandardFields):
     __abstract__ = True
 
@@ -56,19 +65,18 @@ class AbstractBaseNode(BaseNodeStandardFields):
     embedded_nodes_instantiated: typing.ClassVar[bool] = False
 
     # real_type: str = pydantic.Field(default_factory=)
-    outgoing_relations: typing.ClassVar[dict[str, _PG_OutgoingRelationDefinition]]
+    outgoing_relations: typing.ClassVar[dict[str, _OutgoingRelationDefinition]]
 
     def __init_subclass__(cls):
+        cls.__setup_run_init_subclass_checks__()
         cls.__pg_add_type_to_trait_list_of_real_types__()
-
-        # cls.__pg_delete_indirect_non_heritable_mixin_fields__()
 
         cls.__abstract__ = cls.__dict__.get("__abstract__", False)
 
         cls.model_rebuild(force=True)
 
     @classmethod
-    def __pg_get_model_labels__(cls) -> list[str]:
+    def _get_model_labels(cls) -> list[str]:
         """All neo4j labels for model.
 
         Includes direct Trait names."""
@@ -124,16 +132,20 @@ class AbstractBaseNode(BaseNodeStandardFields):
         return set(traits_as_indirect_ancestors)
 
     @classmethod
-    def __pg_delete_indirect_non_heritable_mixin_fields__(cls) -> None:
-        trait_fields_to_delete = set()
-        for trait in cls.__pg_get_non_heritable_mixins_as_indirect_ancestors__():
-            for field_name in cls.model_fields:
-                # AND AND... not in the parent class annotations that is *not* a trait...
-                if (
-                    field_name in trait.__annotations__
-                    and trait not in cls.__annotations__
-                ):
-                    trait_fields_to_delete.add(field_name)
-        print(cls, trait_fields_to_delete, cls.model_fields)
-        for td in trait_fields_to_delete:
-            del cls.model_fields[td]
+    def __setup_run_init_subclass_checks__(cls):
+        """Run checks on subclasses for validity, following rules below.
+
+        1. Cannot have field named `relation_properties` as this is used internally
+        2. Cannot have 'Embedded' in class name"""
+
+        for field_name, field in cls.model_fields.items():
+            if field_name == "relation_properties":
+                raise PanglossConfigError(
+                    f"Field 'relation_properties' (on model {cls.__name__}) is a reserved name. Please rename this field."
+                )
+
+        if "Embedded" in cls.__name__:
+            raise PanglossConfigError(
+                f"Base models cannot use 'Embedded' as part of the name, as this is used "
+                f"internally. (Model '{cls.__name__}' should be renamed)"
+            )

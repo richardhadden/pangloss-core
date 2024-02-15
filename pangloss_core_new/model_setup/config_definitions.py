@@ -43,7 +43,7 @@ class RelationConfig:
 
 
 @dataclasses.dataclass
-class _PG_RelationshipConfigInstantiated:
+class _RelationConfigInstantiated:
     """Internal version of RelationConfig for storing the config on
     relationship declaration. Avoids exposing the `relation_to_base` variable
     as something settable by user. Redeclares variables
@@ -62,7 +62,7 @@ class _PG_RelationshipConfigInstantiated:
 
 
 @dataclasses.dataclass
-class _PG_OutgoingRelationDefinition:
+class _OutgoingRelationDefinition:
     """Class containing the definition of an outgoing node:
 
     - `target_base_class: type[BaseNode]`: the target ("to") class of the relationship
@@ -73,7 +73,7 @@ class _PG_OutgoingRelationDefinition:
 
     target_base_class: type["AbstractBaseNode"]
     target_reference_class: type["BaseNodeReference"]
-    relation_config: _PG_RelationshipConfigInstantiated
+    relation_config: _RelationConfigInstantiated
     origin_base_class: type["AbstractBaseNode"]
 
     def __hash__(self):
