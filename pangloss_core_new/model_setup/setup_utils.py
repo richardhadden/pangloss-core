@@ -1,6 +1,8 @@
 import dataclasses
+import inspect
 import types
 import typing
+
 
 import annotated_types
 import pydantic
@@ -18,11 +20,16 @@ from pangloss_core_new.model_setup.config_definitions import (
     _EmbeddedNodeDefinition,
     _RelationConfigInstantiated,
     _OutgoingRelationDefinition,
+    _OutgoingReifiedRelationDefinition,
     RelationConfig,
 )
 from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
 from pangloss_core_new.model_setup.relation_properties_model import (
     RelationPropertiesModel,
+)
+from pangloss_core_new.model_setup.relation_to import (
+    ReifiedRelation,
+    ReifiedTargetConfig,
 )
 
 
@@ -352,8 +359,10 @@ def __setup_create_reference_class__(
     origin_class_name: str | None = None,
     relation_properties_model: type[RelationPropertiesModel] | None = None,
 ) -> type[BaseNodeReference]:
+    print(cls)
     if not getattr(cls, "Reference", None) or not cls.Reference.base_class == cls:
         __setup_initialise_reference_class__(cls)
+
     print(cls.Reference)
     if not relation_properties_model:
         return cls.Reference
@@ -397,3 +406,124 @@ def __setup_run_init_subclass_checks__(cls: type[AbstractBaseNode]):
             f"Base models cannot use 'Embedded' as part of the name, as this is used "
             f"internally. (Model '{cls.__name__}' should be renamed)"
         )
+
+
+def __setup_update_reified_relation_annotations__(cls: type["AbstractBaseNode"]):
+    for field_name, field in cls.model_fields.items():
+        if (
+            typing.get_args(field.annotation)
+            and inspect.isclass(typing.get_args(field.annotation)[0])
+            and issubclass(typing.get_args(field.annotation)[0], ReifiedRelation)
+        ):
+            field.annotation = field.rebuild_annotation()
+
+            reification_class, *other_annotations = typing.get_args(field.annotation)
+            reification_class: type[ReifiedRelation] = reification_class
+            relation_config = typing.get_args(field.annotation)[1]
+            try:
+                relation_config: RelationConfig = [
+                    item
+                    for item in other_annotations
+                    if isinstance(item, RelationConfig)
+                    and not isinstance(item, ReifiedTargetConfig)
+                ][0]
+
+            except IndexError:
+                raise PanglossConfigError(
+                    f"{cls.__name__}.{field_name} is missing a RelationConfig object)"
+                )
+
+            try:
+                target_config = [
+                    item
+                    for item in other_annotations
+                    if isinstance(item, ReifiedTargetConfig)
+                ][0]
+            except IndexError:
+                target_config = ReifiedTargetConfig(reverse_name="is_target_of")
+
+            other_annotations = [
+                item
+                for item in other_annotations
+                if not isinstance(item, (RelationConfig, ReifiedTargetConfig))
+            ]
+
+            target_class: type["AbstractBaseNode"] = typing.cast(
+                type["AbstractBaseNode"],
+                reification_class.model_fields["target"].annotation,
+            )
+
+            print("target class", target_class)
+            (
+                annotated_target_type,
+                instantiated_target_config,
+            ) = __setup_build_expanded_relation_annotation_type__(
+                related_model=target_class,
+                relation_config=target_config,
+                other_annotations=other_annotations,
+                relation_name="target",
+                origin_class_name=reification_class.__name__,
+            )
+            print("here")
+            new_reification_model: type[AbstractBaseNode] = typing.cast(
+                type[AbstractBaseNode],
+                pydantic.create_model(
+                    reification_class.__name__,
+                    __base__=reification_class,
+                    target=(annotated_target_type, ...),
+                    outgoing_relations=(
+                        typing.ClassVar[
+                            dict[
+                                str,
+                                _OutgoingReifiedRelationDefinition
+                                | _OutgoingRelationDefinition,
+                            ]
+                        ],
+                        {},
+                    ),
+                    embedded_nodes=(
+                        typing.ClassVar[dict[str, _EmbeddedNodeDefinition]],
+                        {},
+                    ),
+                    embedded_nodes_instantiated=(typing.ClassVar[bool], False),
+                ),
+            )
+            # TODO: initialise this properly!
+            # new_reification_model.__pg_initialise_relations_and_embedded__()
+            print("now here")
+            new_reification_model.__name__ = (
+                f"{target_class.__name__}{reification_class.__name__.split(" ")[0]}"
+            )
+
+            __setup_update_relation_annotations__(new_reification_model)
+            __setup_update_embedded_definitions__(new_reification_model)
+            new_reification_model.model_rebuild(force=True)
+
+            # if not reification_class.mro()[1].__annotations__.get("label", False):
+            #    del new_reification_model.model_fields["label"]
+            #    new_reification_model.model_rebuild(force=True)
+
+            updated_config = _RelationConfigInstantiated(
+                **dataclasses.asdict(relation_config),
+                relation_to_base=new_reification_model,
+            )
+
+            cls.model_fields[field_name] = pydantic.fields.FieldInfo(
+                annotation=typing.Annotated[list[new_reification_model], updated_config]
+            )
+
+            cls.outgoing_relations[field_name] = _OutgoingReifiedRelationDefinition(
+                target_base_class=new_reification_model,
+                relation_config=updated_config,
+                origin_base_class=cls,
+            )
+
+            """ cls._pg_reified_relations[field_name] = _OutgoingReifiedRelationDefinition(
+                target_base_class=new_reification_model,
+                target_reference_class=__setup_create_reference_class__(
+                    new_reification_model,
+                    relation_properties_model=updated_config.relation_model,
+                ),
+                relation_config=updated_config,
+                origin_base_class=cls,
+            ) """

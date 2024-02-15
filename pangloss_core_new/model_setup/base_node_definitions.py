@@ -5,6 +5,7 @@ from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.config_definitions import (
     _EmbeddedNodeDefinition,
     _OutgoingRelationDefinition,
+    _OutgoingReifiedRelationDefinition,
 )
 from pangloss_core_new.model_setup.models_base import BaseNodeStandardFields, CamelModel
 from pangloss_core_new.model_setup.subnode_proxy import SubNodeProxy
@@ -47,14 +48,6 @@ class BaseMixin:
     pass
 
 
-class RelationPropertiesModel(CamelModel):
-    """Parent class for relationship properties
-
-    TODO: Check types on subclassing, to make sure only viable literals allowed"""
-
-    pass
-
-
 class AbstractBaseNode(BaseNodeStandardFields):
     __abstract__ = True
 
@@ -67,7 +60,9 @@ class AbstractBaseNode(BaseNodeStandardFields):
     embedded_nodes_instantiated: typing.ClassVar[bool] = False
 
     # real_type: str = pydantic.Field(default_factory=)
-    outgoing_relations: typing.ClassVar[dict[str, _OutgoingRelationDefinition]]
+    outgoing_relations: typing.ClassVar[
+        dict[str, _OutgoingReifiedRelationDefinition | _OutgoingRelationDefinition]
+    ]
 
     def __init_subclass__(cls):
         cls.__setup_run_init_subclass_checks__()

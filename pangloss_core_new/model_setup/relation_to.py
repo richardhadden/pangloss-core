@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import typing
+import uuid
 
 import pydantic
 import pydantic_core
+
+from pangloss_core_new.model_setup.base_node_definitions import AbstractBaseNode
+from pangloss_core_new.model_setup.config_definitions import RelationConfig
 
 
 class RelationTo[T](typing.Sequence[T]):
@@ -32,3 +38,25 @@ class RelationTo[T](typing.Sequence[T]):
         return pydantic_core.core_schema.union_schema(
             [instance_schema, non_instance_schema]
         )
+
+
+class ReifiedRelation[T](pydantic.BaseModel):
+    __abstract__ = True
+    target: T
+    uid: uuid.UUID = pydantic.Field(default_factory=uuid.uuid4)
+
+
+class ReifiedTargetConfig(RelationConfig):
+    """Provides configuration for relation between a `ReifiedRelation` and the target `BaseNode` type, e.g.:
+
+    ```
+    class Person:
+        pets: RelationTo[
+            Pet,
+            ReifiedRelationConfig(validators=[MaxLen(2)]),
+            TargetRelationConfig(reverse_name="owned_by"),
+        ]
+    ```
+    """
+
+    pass

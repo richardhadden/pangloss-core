@@ -16,7 +16,11 @@ from pangloss_core_new.model_setup.config_definitions import (
 )
 from pangloss_core_new.model_setup.embedded import Embedded
 from pangloss_core_new.model_setup.model_manager import ModelManager
-from pangloss_core_new.model_setup.relation_to import RelationTo
+from pangloss_core_new.model_setup.relation_to import (
+    RelationTo,
+    ReifiedRelation,
+    ReifiedTargetConfig,
+)
 from pangloss_core_new.models import BaseNode
 
 
@@ -541,3 +545,58 @@ def test_relation_to_trait():
         for rel_def in OtherPurchaseableThing.incoming_relations["purchased_by"]
     } == {Person, Organisation}
     """
+
+
+def test_reified_relation():
+    # from pangloss_core.models_new import DataT
+
+    class Person(BaseNode):
+        has_thing: typing.Annotated[
+            ThingIdentification[Thing],
+            RelationConfig(reverse_name="is_thing_of_person"),
+            ReifiedTargetConfig(reverse_name="is_target_of"),
+        ]
+
+    class Stuff(BaseNode):
+        pass
+
+    class Thing(BaseNode):
+        pass  # something: int
+
+    class ThingIdentification[T](ReifiedRelation[T]):
+        identification_type: str
+        has_stuff: typing.Annotated[
+            RelationTo[Stuff], RelationConfig(reverse_name="person_identified_stuff")
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    print(Person.model_fields)
+    print(Person.outgoing_relations)
+
+    assert Person.outgoing_relations["has_thing"].origin_base_class == Person
+    assert set(
+        Person.outgoing_relations["has_thing"].target_base_class.model_fields.keys()
+    ) == set(["uid", "target", "identification_type", "has_stuff"])
+
+    assert (
+        typing.get_args(
+            typing.get_args(
+                Person.outgoing_relations["has_thing"]
+                .target_base_class.model_fields["target"]
+                .annotation
+            )[0]
+        )[0].__name__
+        == "ThingReference"
+    )
+
+    p = Person(
+        label="John Smith",
+        has_thing=[
+            {
+                "identification_type": "nice",
+                "has_stuff": [{"real_type": "stuff", "label": "some stuff"}],
+                "target": [{"label": "A Thing"}],
+            }
+        ],
+    )

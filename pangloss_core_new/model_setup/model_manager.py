@@ -4,6 +4,7 @@ from pangloss_core_new.model_setup.setup_utils import (
     __setup_update_embedded_definitions__,
     __setup_update_relation_annotations__,
     __setup_initialise_reference_class__,
+    __setup_update_reified_relation_annotations__,
 )
 
 
@@ -28,6 +29,7 @@ class ModelManager:
 
             subclass.outgoing_relations = {}
             __setup_update_relation_annotations__(subclass)
+            __setup_update_reified_relation_annotations__(subclass)
             subclass.model_rebuild(force=True, _parent_namespace_depth=depth)
 
             subclass.embedded_nodes = {}

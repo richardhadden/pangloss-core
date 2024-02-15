@@ -85,6 +85,28 @@ class _OutgoingRelationDefinition:
 
 
 @dataclasses.dataclass
+class _OutgoingReifiedRelationDefinition:
+    """Class containing the definition of an outgoing node:
+
+    - `target_base_class: type[BaseNode]`: the target ("to") class of the relationship
+    - `target_reference_class: type[BaseNodeReference]`: the reference class of the target class
+    - `relation_config: _PG_RelationshipConfigInstantiated`: the configuration model for the relationship
+    - `origin_base_class: type[BaseNode]`: the origin ("from") class of the relationship
+    """
+
+    target_base_class: type["AbstractBaseNode"]
+    relation_config: _RelationConfigInstantiated
+    origin_base_class: type["AbstractBaseNode"]
+
+    def __hash__(self):
+        return hash(
+            repr(self.origin_base_class)
+            + repr(self.target_base_class)
+            + repr(self.relation_config)
+        )
+
+
+@dataclasses.dataclass
 class EmbeddedConfig:
     validators: typing.Optional[typing.Sequence[annotated_types.BaseMetadata]] = None
 
