@@ -6,13 +6,13 @@ from pangloss_core_new.model_setup.setup_utils import (
     __setup_delete_indirect_non_heritable_mixin_fields__,
     __setup_update_embedded_definitions__,
     __setup_update_relation_annotations__,
-    __setup_initialise_reference_class__,
     __setup_update_reified_relation_annotations__,
     __setup_add_incoming_relations_to_related_models__,
     __setup_delete_subclassed_relations__,
     __setup_add_all_property_fields__,
     __setup_construct_view_type__,
     __setup_construct_edit_type__,
+    __setup_create_reference_class__,
 )
 
 
@@ -33,8 +33,6 @@ class ModelManager:
     @classmethod
     def initialise_models(cls, depth=2):
         for subclass in cls._registered_models:
-            print("Initialising", subclass.__name__)
-
             __setup_delete_indirect_non_heritable_mixin_fields__(subclass)
             subclass.model_rebuild(force=True, _parent_namespace_depth=depth)
 
@@ -53,9 +51,11 @@ class ModelManager:
         for subclass in cls._registered_models:
             __setup_add_incoming_relations_to_related_models__(subclass)
             __setup_add_all_property_fields__(subclass)
-            # __setup_initialise_reference_class__(subclass)
 
         for subclass in cls._registered_models:
             __setup_construct_view_type__(subclass)
             subclass.model_rebuild(force=True, _parent_namespace_depth=depth)
             __setup_construct_edit_type__(subclass)
+
+            __setup_create_reference_class__(subclass)
+            subclass.model_rebuild(force=True, _parent_namespace_depth=depth)

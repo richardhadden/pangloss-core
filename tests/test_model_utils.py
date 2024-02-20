@@ -64,3 +64,20 @@ def test_get_concrete_node_classes_with_union():
     assert _get_concrete_node_classes(
         typing.Union[Cat, Dog], include_subclasses=True
     ) == set([Cat, Dog, TinyCat, TinyDog, PicoDog])
+
+
+def test_get_concrete_node_classes_with_abstract():
+    class DateBase(BaseNode):
+        __abstract__ = True
+
+    class DatePrecise(DateBase):
+        date_precise: str
+
+    class DateImprecise(DateBase):
+        date_not_before: str
+        date_not_after: str
+
+    assert _get_concrete_node_classes(DateBase, include_subclasses=True) == {
+        DatePrecise,
+        DateImprecise,
+    }

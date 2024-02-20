@@ -6,7 +6,9 @@ import uuid
 import pydantic
 import pydantic_core
 
-from pangloss_core_new.model_setup.base_node_definitions import AbstractBaseNode
+from pangloss_core_new.model_setup.models_base import CamelModel
+
+
 from pangloss_core_new.model_setup.config_definitions import RelationConfig
 
 
@@ -40,10 +42,17 @@ class RelationTo[T](typing.Sequence[T]):
         )
 
 
-class ReifiedRelation[T](pydantic.BaseModel):
+class ReifiedRelation[T](CamelModel):
     __abstract__ = True
     target: T
     uid: uuid.UUID = pydantic.Field(default_factory=uuid.uuid4)
+
+    @classmethod
+    def _get_model_labels(cls):
+        return [cls.__name__.split("[")[0], "ReifiedRelation"]
+
+    # def __str__(self):
+    #    return f"<ReifiedRelation::{self.__class__.__name__} target={self.target.__str__()}"
 
 
 class ReifiedTargetConfig(RelationConfig):

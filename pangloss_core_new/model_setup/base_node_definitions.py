@@ -15,7 +15,7 @@ from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
 
 
 class EmbeddedNodeBase(SubNodeProxy):
-    pass
+    real_type: str
 
 
 class ViewNodeBase(SubNodeProxy):

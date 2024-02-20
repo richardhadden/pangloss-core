@@ -1257,3 +1257,32 @@ def test_embedded_model_does_not_need_label():
             }
         ],
     )
+
+
+def test_types_of_embedded():
+    class DateBase(BaseNode):
+        __abstract__ = True
+
+    class DatePrecise(DateBase):
+        date_precise: str
+
+    class DateImprecise(DateBase):
+        date_not_before: str
+        date_not_after: str
+
+    class Person(BaseNode):
+        date_of_birth: Embedded[DateBase]
+
+    ModelManager.initialise_models(depth=3)
+
+    print(Person.model_fields["date_of_birth"].annotation)
+    print(DatePrecise.Embedded.model_fields)
+
+    person = Person(
+        label="A Person",
+        date_of_birth=[
+            DatePrecise.Embedded(
+                real_type="dateprecise", date_precise="Last February", uid=uuid.uuid4()
+            )
+        ],
+    )

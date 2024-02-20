@@ -81,7 +81,8 @@ def _get_concrete_node_classes(
                 )
             )
     elif issubclass(
-        classes, BaseNonHeritableMixin
+        classes,  # type: ignore
+        BaseNonHeritableMixin,  # type: ignore
     ) and __setup_model_instantiates_abstract_trait__(
         classes  # type: ignore
     ):
@@ -89,25 +90,21 @@ def _get_concrete_node_classes(
             concrete_node_classes += list(_get_concrete_node_classes(cl))
 
     else:  # Classes is a single class
-        concrete_node_classes.append(classes)
         if include_subclasses:
             subclasses = _get_all_subclasses(classes, include_abstract=include_abstract)
             concrete_node_classes.extend(subclasses)
         if include_abstract or not classes.__abstract__:  # type: ignore
             concrete_node_classes.append(classes)
-
-    # concrete_node_classes = [
-    #    concrete_node_class
-    #    for concrete_node_class in concrete_node_classes
-    #
-    #     # and not getattr(concrete_node_class, "is_embedded_type", False)
-    # ]
     return set(concrete_node_classes)
 
 
 def __pg_create_embedded_class__(cls: type[AbstractBaseNode]) -> type[EmbeddedNodeBase]:
     """Create an Embedded type for a BaseNode. If it already exists, return existing"""
-    if hasattr(cls, "Embedded"):
+
+    if (
+        getattr(cls, "Embedded", False)
+        and cls.Embedded.__name__ == f"{cls.__name__}Embedded"
+    ):
         return cls.Embedded
 
     parent_fields = {
@@ -118,7 +115,7 @@ def __pg_create_embedded_class__(cls: type[AbstractBaseNode]) -> type[EmbeddedNo
     embedded_class = pydantic.create_model(
         f"{cls.__name__}Embedded",
         __base__=EmbeddedNodeBase,
-        real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),
+        real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
     )
     embedded_class.base_class = cls
     embedded_class.model_fields.update(parent_fields)
@@ -510,7 +507,19 @@ def __setup_update_reified_relation_annotations__(cls: type["AbstractBaseNode"])
             )
 
             __setup_update_relation_annotations__(new_reification_model)
+
+            ## TODO: HERE
+            new_reification_model.outgoing_relations[
+                "target"
+            ] = _OutgoingRelationDefinition(
+                target_base_class=target_class,
+                target_reference_class=target_class,
+                relation_config=instantiated_target_config,
+                origin_base_class=new_reification_model,
+            )
+
             __setup_update_embedded_definitions__(new_reification_model)
+            __setup_add_all_property_fields__(new_reification_model)
             new_reification_model.model_rebuild(force=True)
 
             # if not reification_class.mro()[1].__annotations__.get("label", False):
@@ -523,7 +532,7 @@ def __setup_update_reified_relation_annotations__(cls: type["AbstractBaseNode"])
             )
 
             cls.model_fields[field_name] = pydantic.fields.FieldInfo(
-                annotation=typing.Annotated[list[new_reification_model], updated_config]
+                annotation=typing.Annotated[list[new_reification_model], updated_config]  # type: ignore
             )
 
             cls.outgoing_relations[field_name] = _OutgoingReifiedRelationDefinition(
@@ -706,7 +715,7 @@ def __setup_construct_view_type__(cls: AbstractBaseNode):
         for incoming_relation in incoming_relation_definitions:
             incoming_related_types.append(incoming_relation.origin_reference_class)
         incoming_model_fields[incoming_relation_name] = (
-            typing.Optional[list[typing.Union[*tuple(incoming_related_types)]]],
+            typing.Optional[list[typing.Union[*tuple(incoming_related_types)]]],  # type: ignore
             None,
         )
 
@@ -726,11 +735,11 @@ def __setup_construct_view_type__(cls: AbstractBaseNode):
         **cls.model_fields,
     }
     view_model.model_rebuild(force=True)
-    cls.View = view_model
+    cls.View = view_model  # type: ignore
 
 
 def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
-    print("Constructing edit type for", cls.__name__)
+    # print("Constructing edit type for", cls.__name__)
     outgoing_relation_new_defs = {}
     for relation_name, relation in cls.outgoing_relations.items():
         if relation.relation_config.edit_inline:
@@ -738,7 +747,6 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
             for concrete_related_type in _get_concrete_node_classes(
                 relation.target_base_class, include_subclasses=True
             ):
-                print(concrete_related_type)
                 all_related_types.append(
                     __setup_construct_edit_type__(concrete_related_type)
                 )
@@ -754,7 +762,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
                 pydantic.Field(default_factory=list),
             )
         else:
-            print(typing.get_args(cls.model_fields[relation_name].annotation))
+            # print(typing.get_args(cls.model_fields[relation_name].annotation))
             all_related_types = []
             for ann in typing.get_args(cls.model_fields[relation_name].annotation):
                 all_related_types.append(ann)
@@ -781,7 +789,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
     )
 
     for property_name, property in cls.property_fields.items():
-        edit_model.model_fields[property_name] = property
+        edit_model.model_fields[property_name] = property  # type: ignore
 
     edit_model.model_rebuild(force=True)
 

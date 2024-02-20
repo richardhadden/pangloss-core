@@ -4,7 +4,6 @@ import typing
 
 import annotated_types
 
-from pangloss_core_new.model_setup.models_base import CamelModel
 
 if typing.TYPE_CHECKING:
     from pangloss_core_new.model_setup.base_node_definitions import (

@@ -9,10 +9,12 @@ readme = "README.md"
 python = "^3.12"
 pydantic = "^2.6.1"
 pyhumps = "^3.8.0"
+neo4j = "^5.17.0"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"
+pytest-asyncio = "^0.23.5"
 
 [build-system]
 requires = ["poetry-core"]
