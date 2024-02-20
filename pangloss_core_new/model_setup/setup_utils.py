@@ -784,6 +784,6 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
         edit_model.model_fields[property_name] = property
 
     edit_model.model_rebuild(force=True)
-    if not getattr(cls, "Edit", False):
-        cls.Edit = edit_model
+
+    cls.Edit = edit_model
     return edit_model
