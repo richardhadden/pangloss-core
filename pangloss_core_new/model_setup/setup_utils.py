@@ -12,7 +12,9 @@ from pangloss_core_new.model_setup.base_node_definitions import (
     AbstractBaseNode,
     BaseMixin,
     BaseNonHeritableMixin,
+    EditNodeBase,
     EmbeddedNodeBase,
+    ViewNodeBase,
 )
 from pangloss_core_new.model_setup.config_definitions import (
     EmbeddedConfig,
@@ -50,7 +52,7 @@ def _get_all_subclasses(
 def __setup_model_instantiates_abstract_trait__(
     cls: type[AbstractBaseNode] | type[BaseMixin],
 ) -> bool:
-    print(cls)
+    # print(cls)
     """Determines whether a Node model is a direct instantiation of a trait."""
     return issubclass(cls, BaseNonHeritableMixin) and cls.__pg_is_subclass_of_trait__()
 
@@ -356,6 +358,9 @@ def __setup_initialise_reference_class__(cls):
         )
 
 
+existing_reference_classes = {}
+
+
 def __setup_create_reference_class__(
     cls: type[AbstractBaseNode],
     relation_name: str | None = None,
@@ -368,13 +373,22 @@ def __setup_create_reference_class__(
     if not relation_properties_model:
         return cls.Reference
     else:
-        return pydantic.create_model(
-            f"{origin_class_name}__{relation_name}__{cls.__name__}Reference",
-            __base__=BaseNodeReference,
-            base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
-            real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
-            relation_properties=(relation_properties_model, ...),
+        reference_model_name = (
+            f"{origin_class_name}__{relation_name}__{cls.__name__}Reference"
         )
+        if reference_model_name in existing_reference_classes:
+            return existing_reference_classes[reference_model_name]
+
+        else:
+            new_reference_class = pydantic.create_model(
+                reference_model_name,
+                __base__=BaseNodeReference,
+                base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
+                real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+                relation_properties=(relation_properties_model, ...),
+            )
+            existing_reference_classes[reference_model_name] = new_reference_class
+            return new_reference_class
 
 
 def __setup_delete_indirect_non_heritable_mixin_fields__(
@@ -599,7 +613,7 @@ def __setup_add_incoming_relations_to_related_models__(cls: type[AbstractBaseNod
             )
 
             for target_base_class in target_base_classes:
-                print(cls.__name__, target_base_class.__name__)
+                # print(cls.__name__, target_base_class.__name__)
                 # print(target_base_class)
                 target_base_class.incoming_relations[
                     relation_definition.relation_config.reverse_name
@@ -616,3 +630,160 @@ def __setup_add_incoming_relations_to_related_models__(cls: type[AbstractBaseNod
                         target_base_class=target_base_class,
                     )
                 )
+
+
+def __setup_delete_subclassed_relations__(cls: type[AbstractBaseNode]):
+    for relation_name, relation_definition in [*cls.outgoing_relations.items()]:
+        if relation_definition.relation_config.subclasses_relation:
+            if (
+                relation_definition.relation_config.subclasses_relation
+                not in cls.model_fields
+            ):
+                raise PanglossConfigError(
+                    f"Relation '{cls.__name__}.{relation_name}' "
+                    f"is trying to subclass the relation "
+                    f"'{relation_definition.relation_config.subclasses_relation}', but this "
+                    f"does not exist on any parent class of '{cls.__name__}'"
+                )
+
+            del cls.model_fields[
+                relation_definition.relation_config.subclasses_relation
+            ]
+
+            del cls.outgoing_relations[
+                relation_definition.relation_config.subclasses_relation
+            ]
+            # cls.model_rebuild(force=True)
+            relation_definition.relation_config.relation_labels.add(
+                relation_definition.relation_config.subclasses_relation
+            )
+
+        for cl in cls.mro():
+            if cl is AbstractBaseNode:
+                break
+            if issubclass(cl, AbstractBaseNode):
+                if (
+                    relation_definition.relation_config.subclasses_relation
+                    in cl.model_fields
+                ):
+                    # TODO: no idea what this 'extra_label' variable is for
+                    # extra_label = cl.outgoing_relations[
+                    #    relation_definition.relation_config.subclasses_relation
+                    # ].relation_config.relation_labels
+                    # print("extra label")
+                    relation_definition.relation_config.relation_labels.update(
+                        cl.outgoing_relations[
+                            relation_definition.relation_config.subclasses_relation
+                        ].relation_config.relation_labels
+                    )
+    # print("MODEL FIELDS", cls.model_fields.keys())
+    cls.model_rebuild(force=True)
+
+
+def __setup_add_all_property_fields__(cls: type[AbstractBaseNode]) -> None:
+    property_fields = {}
+
+    for field_name, field in cls.model_fields.items():
+        # print(field)
+        if (
+            field_name not in cls.outgoing_relations
+            and field_name not in cls.embedded_nodes
+        ):
+            property_fields[field_name] = field
+    cls.property_fields = property_fields
+
+
+def __setup_construct_view_type__(cls: AbstractBaseNode):
+    """Constructs a view type on the class."""
+    # print(cls.__name__, cls.incoming_relations)
+    incoming_model_fields = {}
+
+    for (
+        incoming_relation_name,
+        incoming_relation_definitions,
+    ) in cls.incoming_relations.items():
+        incoming_related_types: list[type[BaseNodeReference]] = []
+        for incoming_relation in incoming_relation_definitions:
+            incoming_related_types.append(incoming_relation.origin_reference_class)
+        incoming_model_fields[incoming_relation_name] = (
+            typing.Optional[list[typing.Union[*tuple(incoming_related_types)]]],
+            None,
+        )
+
+    view_model = pydantic.create_model(
+        f"{cls.__name__}View",
+        __base__=ViewNodeBase,
+        is_view_model=(
+            typing.ClassVar[bool],
+            True,
+        ),
+        **incoming_model_fields,
+        base_class=(typing.ClassVar[type[AbstractBaseNode]], cls),
+    )
+
+    view_model.model_fields = {
+        **view_model.model_fields,
+        **cls.model_fields,
+    }
+    view_model.model_rebuild(force=True)
+    cls.View = view_model
+
+
+def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
+    print("Constructing edit type for", cls.__name__)
+    outgoing_relation_new_defs = {}
+    for relation_name, relation in cls.outgoing_relations.items():
+        if relation.relation_config.edit_inline:
+            all_related_types = []
+            for concrete_related_type in _get_concrete_node_classes(
+                relation.target_base_class, include_subclasses=True
+            ):
+                print(concrete_related_type)
+                all_related_types.append(
+                    __setup_construct_edit_type__(concrete_related_type)
+                )
+
+            all_related_types = tuple(all_related_types)
+
+            outgoing_relation_new_defs[relation_name] = (
+                typing.Annotated[
+                    list[typing.Union[*all_related_types]],  # type: ignore
+                    relation.relation_config.validators,
+                    relation.relation_config,
+                ],
+                pydantic.Field(default_factory=list),
+            )
+        else:
+            print(typing.get_args(cls.model_fields[relation_name].annotation))
+            all_related_types = []
+            for ann in typing.get_args(cls.model_fields[relation_name].annotation):
+                all_related_types.append(ann)
+
+            all_related_types = tuple(all_related_types)
+            outgoing_relation_new_defs[relation_name] = (
+                typing.Annotated[
+                    list[typing.Union[*all_related_types]],  # type: ignore
+                    relation.relation_config.validators,
+                    relation.relation_config,
+                ],
+                pydantic.Field(default_factory=list),
+            )
+
+    edit_model = pydantic.create_model(
+        f"{cls.__name__}Edit",
+        __base__=EditNodeBase,
+        is_view_model=(
+            typing.ClassVar[bool],
+            True,
+        ),
+        base_class=(typing.ClassVar[AbstractBaseNode], cls),
+        **outgoing_relation_new_defs,
+    )
+
+    for property_name, property in cls.property_fields.items():
+        edit_model.model_fields[property_name] = property
+
+    edit_model.model_rebuild(force=True)
+    if not getattr(cls, "Edit", False):
+        cls.Edit = edit_model
+    return edit_model

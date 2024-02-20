@@ -9,11 +9,13 @@ import pytest
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.base_node_definitions import (
     BaseNonHeritableMixin,
+    EditNodeBase,
 )
 from pangloss_core_new.model_setup.config_definitions import (
     EmbeddedConfig,
     RelationConfig,
 )
+from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
 from pangloss_core_new.model_setup.relation_properties_model import (
     RelationPropertiesModel,
 )
@@ -30,6 +32,22 @@ from pangloss_core_new.models import BaseNode
 @pytest.fixture(scope="function", autouse=True)
 def reset_model_manager():
     ModelManager._reset()
+
+
+def test_model_manager_cannot_be_instantiated():
+    with pytest.raises(Exception):
+        ModelManager()
+
+
+def test_models_added_to_model_manager():
+    class Thing(BaseNode):
+        pass
+
+    class Other(BaseNode):
+        pass
+
+    ModelManager.initialise_models(depth=3)
+    assert set(ModelManager._registered_models) == {Thing, Other}
 
 
 def test_get_labels():
@@ -532,7 +550,7 @@ def test_relation_to_trait():
     assert (
         Person.outgoing_relations["purchased_stuff"].target_base_class == Purchaseable
     )
-    """TODO: add in once incoming rels are done
+
     assert len(PurchaseableThing.incoming_relations) == 1
     assert len(OtherPurchaseableThing.incoming_relations) == 1
 
@@ -547,12 +565,9 @@ def test_relation_to_trait():
         rel_def.origin_base_class
         for rel_def in OtherPurchaseableThing.incoming_relations["purchased_by"]
     } == {Person, Organisation}
-    """
 
 
 def test_reified_relation():
-    # from pangloss_core.models_new import DataT
-
     class Person(BaseNode):
         has_thing: typing.Annotated[
             ThingIdentification[Thing],
@@ -717,9 +732,6 @@ def test_incoming_relation_definitions():
     }
 
 
-# TODO: only View class needs reverse relations...OBVS?
-
-
 def test_incoming_relations_through_embedded():
     """
     Incoming relations for a node should point to the outer node as well as the directly attached node.
@@ -873,3 +885,375 @@ def test_incoming_relations_through_double_embedded():
         InnerThing,
         DoubleInnerThing,
     }
+
+
+def test_reverse_relation_to_reified():
+    class IdentificationIdentifiedEntityRelation(RelationPropertiesModel):
+        certainty: int
+
+    class Identification[T](ReifiedRelation[T]):
+        pass
+
+    class Person(BaseNode):
+        name: str
+
+    class Event(BaseNode):
+        person_hosting: typing.Annotated[
+            Identification[Person],
+            RelationConfig(
+                reverse_name="hosted_event",
+            ),
+            ReifiedTargetConfig(
+                reverse_name="is_target_of",
+                relation_model=IdentificationIdentifiedEntityRelation,
+            ),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Person.incoming_relations["hosted_event"]
+    person_hosted_event = Person.incoming_relations["hosted_event"].pop()
+    assert person_hosted_event.origin_base_class is Event
+    assert person_hosted_event.target_base_class is Person
+    assert person_hosted_event.reification_class.__name__.startswith(
+        "PersonIdentification"
+    )
+
+
+def test_basic_relation_subclassing():
+    class Dog(BaseNode):
+        pass
+
+    class Person(BaseNode):
+        person_owns_dog: typing.Annotated[
+            RelationTo[Dog], RelationConfig(reverse_name="dog_owned_by_person")
+        ]
+
+    class Dude(Person):
+        dude_owns_dog: typing.Annotated[
+            RelationTo[Dog],
+            RelationConfig(
+                reverse_name="dog_owned_by_dude",
+                subclasses_relation="person_owns_dog",
+            ),
+        ]
+
+    class MediumDude(Dude):
+        pass
+
+    class MiniDude(Dude):
+        minidude_owns_dog: typing.Annotated[
+            RelationTo[Dog],
+            RelationConfig(
+                reverse_name="dog_owned_by_minidude",
+                subclasses_relation="dude_owns_dog",
+            ),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert "person_owns_dog" not in Dude.model_fields
+    assert "dude_owns_dog" in Dude.model_fields
+
+    assert "person_owns_dog" not in Dude.outgoing_relations
+
+    assert Dude.outgoing_relations["dude_owns_dog"].relation_config.relation_labels == {
+        "person_owns_dog"
+    }
+
+    assert "person_owns_dog" not in MediumDude.model_fields
+    assert "dude_owns_dog" in MediumDude.model_fields
+
+    assert MediumDude.outgoing_relations[
+        "dude_owns_dog"
+    ].relation_config.relation_labels == {"person_owns_dog"}
+
+    assert "dude_owns_dog" not in MiniDude.model_fields
+    assert "minidude_owns_dog" in MiniDude.model_fields
+
+    assert MiniDude.outgoing_relations[
+        "minidude_owns_dog"
+    ].relation_config.relation_labels == {"person_owns_dog", "dude_owns_dog"}
+
+
+def test_error_raised_by_subclassing_non_existant_relation():
+    class Dog(BaseNode):
+        pass
+
+    class Person(BaseNode):
+        person_owns_dog: typing.Annotated[
+            RelationTo[Dog], RelationConfig(reverse_name="dog_owned_by_person")
+        ]
+
+    class Dude(Person):
+        dude_owns_dog: typing.Annotated[
+            RelationTo[Dog],
+            RelationConfig(
+                reverse_name="dog_owned_by_dude",
+                subclasses_relation="person_owns_dog",
+            ),
+        ]
+
+    class Breaking(Dude):
+        breaking_owns_dog: typing.Annotated[
+            RelationTo[Dog],
+            RelationConfig(
+                reverse_name="dog_owned_by_minidude",
+                subclasses_relation="not_a_real_label",
+            ),
+        ]
+
+    with pytest.raises(PanglossConfigError):
+        ModelManager.initialise_models(depth=3)
+
+
+def test_get_all_properties():
+    class Pet(BaseNode):
+        pass
+
+    class Thing(BaseNode):
+        name: str
+        age: int
+        pets: typing.Annotated[RelationTo[Pet], RelationConfig("is_pet_of")]
+
+    ModelManager.initialise_models(depth=3)
+
+    thing = Thing(
+        uid=uuid.uuid4(),
+        label="A Thing",
+        name="Mr Thing",
+        age=100,
+        pets=[{"label": "Mr Fluffly"}],
+    )
+
+    assert set(Thing.property_fields.keys()) == set(["age", "name", "uid", "label"])
+
+
+def test_initialisation_of_models_with_path_data_are_grouped_as_relation_properties():
+    """Neo4J path-to-tree function turns relation properties into dot-separated properties
+    of the object itself, i.e. (from code below)
+
+    {
+        ...
+        "label": "FluffyCat",
+        "has_pet.purchased_when": "February"
+        ...
+    }
+
+    We need to grab all these dot-separated properties and transform them into a
+    single relation-dict. Probably best to do this on init?
+
+
+    """
+
+    class PersonHasPetRelation(RelationPropertiesModel):
+        purchased_when: str
+
+    class Pet(BaseNode):
+        pass
+
+    class Person(BaseNode):
+        has_pet: typing.Annotated[
+            RelationTo[Pet],
+            RelationConfig(
+                reverse_name="is_pet_of", relation_model=PersonHasPetRelation
+            ),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    person = Person(
+        label="John Smith",
+        has_pet=[
+            {
+                "uid": uuid.uuid4(),
+                "label": "FluffyCat",
+                "real_type": "pet",
+                "has_pet.purchased_when": "February",
+            }
+        ],
+    )
+
+    assert person.label == "John Smith"
+    pet = person.has_pet.pop()
+    assert pet.label == "FluffyCat"
+    assert pet.relation_properties.purchased_when == "February"
+
+
+def test_contruct_view_type_basic():
+    class Pet(BaseNode):
+        name: str
+
+    class Person(BaseNode):
+        age: int
+        has_pet: typing.Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    Pet.View(
+        uid=uuid.uuid4(),
+        label="Something",
+        name="Something",
+        is_pet_of=[{"uid": uuid.uuid4(), "label": "John Smith", "real_type": "person"}],
+    )
+
+    # assert not hasattr(Person, "View")
+
+    # Person.__pg_construct_view_type__()
+    assert Person.View.__name__ == "PersonView"
+    # Sanity check: make sure inheriting fields from main class
+    assert Person.View.model_fields["age"]
+    assert Person.View.model_fields["has_pet"]
+
+    assert Pet.View.model_fields["label"]
+
+    assert Pet.View.model_fields["is_pet_of"]
+
+    Pet.View(
+        uid=uuid.uuid4(),
+        label="Something",
+        name="Something",
+        is_pet_of=[{"uid": uuid.uuid4(), "label": "John Smith", "real_type": "person"}],
+    )
+
+    assert Pet.View.base_class is Pet
+
+
+def test_inline_creation_returns_correct_model():
+    class Activity(BaseNode):
+        activity_type: str
+        date: str
+        cost: int
+
+    class Order(BaseNode):
+        thing_ordered: typing.Annotated[
+            RelationTo[Activity],
+            RelationConfig(reverse_name="was_ordered_by", create_inline=True),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert (
+        typing.get_args(Order.model_fields["thing_ordered"].annotation)[0] is Activity
+    )
+
+    order = Order(
+        label="Gives an order",
+        thing_ordered=[
+            {
+                "label": "Making Soup",
+                "activity_type": "cookery",
+                "date": "February",
+                "cost": 1,
+            }
+        ],
+    )
+
+    assert order.thing_ordered[0].date == "February"
+
+
+def test_edit_inline_returns_correct_model():
+    class Activity(BaseNode):
+        activity_type: str
+        date: str
+        cost: int
+
+    class Order(BaseNode):
+        thing_ordered: typing.Annotated[
+            RelationTo[Activity],
+            RelationConfig(
+                reverse_name="was_ordered_by", create_inline=True, edit_inline=True
+            ),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Order.Edit
+    assert Order.Edit.base_class is Order
+    assert issubclass(Order.Edit, EditNodeBase)
+
+    # print(Order.Edit.model_fields)
+
+    assert (
+        typing.get_args(Order.Edit.model_fields["thing_ordered"].annotation)[0].__name__
+        == Activity.Edit.__name__
+    )
+
+
+def test_edit_model_inline_relations_are_edit_models_all_the_way_down():
+    class Person(BaseNode):
+        pass
+
+    class Activity(BaseNode):
+        activity_type: str
+        date: str
+        cost: int
+
+    class Order(BaseNode):
+        thing_ordered: typing.Annotated[
+            RelationTo[Activity],
+            RelationConfig(
+                reverse_name="was_ordered_by", create_inline=True, edit_inline=True
+            ),
+        ]
+        person_ordering: typing.Annotated[
+            RelationTo[Person], RelationConfig(reverse_name="gave_order")
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Order.Edit
+
+    # Check we get the right types: editable-inline models should be Edit-type
+    for model_type in typing.get_args(
+        Order.Edit.model_fields["thing_ordered"].annotation
+    ):
+        assert issubclass(model_type, EditNodeBase)
+
+    # Whereas normal relations ought to be Reference-type
+    for model_type in typing.get_args(
+        Order.Edit.model_fields["person_ordering"].annotation
+    ):
+        assert issubclass(model_type, BaseNodeReference)
+
+
+def test_embedded_model_does_not_need_label():
+    class DoubleInner(BaseNode):
+        name: str
+
+    class Inner(BaseNode):
+        double_inner: Embedded[DoubleInner]
+        name: str
+
+    class Outer(BaseNode):
+        inner: Embedded[Inner]
+        name: str
+
+    class Person(BaseNode):
+        outer: Embedded[Outer]
+
+    ModelManager.initialise_models(depth=3)
+
+    person = Person(
+        label="PersonLabel",
+        outer=[
+            {
+                "name": "OuterName",
+                "real_type": "outer",
+                "inner": [
+                    {
+                        "name": "InnerName",
+                        "real_type": "inner",
+                        "double_inner": [
+                            {
+                                "real_type": "doubleinner",
+                                "name": "DoubleInnerName",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    )

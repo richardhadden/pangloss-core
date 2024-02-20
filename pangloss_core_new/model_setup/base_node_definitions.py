@@ -70,6 +70,8 @@ class AbstractBaseNode(BaseNodeStandardFields):
         dict[str, set[_IncomingRelationDefinition | _IncomingReifiedRelationDefinition]]
     ]
 
+    property_fields: typing.ClassVar[dict[str, type]]
+
     def __init_subclass__(cls):
         cls.__setup_run_init_subclass_checks__()
         cls.__pg_add_type_to_trait_list_of_real_types__()
