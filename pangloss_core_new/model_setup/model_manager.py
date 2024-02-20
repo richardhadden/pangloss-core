@@ -1,10 +1,14 @@
+from collections import defaultdict
+
+
 from pangloss_core_new.model_setup.setup_utils import (
     __pg_create_embedded_class__,
     __setup_delete_indirect_non_heritable_mixin_fields__,
     __setup_update_embedded_definitions__,
     __setup_update_relation_annotations__,
-    __setup_initialise_reference_class__,
+    # __setup_initialise_reference_class__,
     __setup_update_reified_relation_annotations__,
+    __setup_add_incoming_relations_to_related_models__,
 )
 
 
@@ -36,4 +40,9 @@ class ModelManager:
             __setup_update_embedded_definitions__(subclass)
             subclass.Embedded = __pg_create_embedded_class__(subclass)
 
+            subclass.incoming_relations = defaultdict(set)
             subclass.model_rebuild(force=True, _parent_namespace_depth=depth)
+
+        for subclass in cls._registered_models:
+            __setup_add_incoming_relations_to_related_models__(subclass)
+            # __setup_add_incoming_relations_through_embedded__(subclass)

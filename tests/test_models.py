@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing
+import uuid
 
 import annotated_types
 import pytest
@@ -12,6 +13,8 @@ from pangloss_core_new.model_setup.base_node_definitions import (
 from pangloss_core_new.model_setup.config_definitions import (
     EmbeddedConfig,
     RelationConfig,
+)
+from pangloss_core_new.model_setup.relation_properties_model import (
     RelationPropertiesModel,
 )
 from pangloss_core_new.model_setup.embedded import Embedded
@@ -571,9 +574,6 @@ def test_reified_relation():
 
     ModelManager.initialise_models(depth=3)
 
-    print(Person.model_fields)
-    print(Person.outgoing_relations)
-
     assert Person.outgoing_relations["has_thing"].origin_base_class == Person
     assert set(
         Person.outgoing_relations["has_thing"].target_base_class.model_fields.keys()
@@ -600,3 +600,276 @@ def test_reified_relation():
             }
         ],
     )
+
+
+def test_reified_relation_init_works():
+    class IdentificationIdentifiedEntityRelation(RelationPropertiesModel):
+        certainty: int
+
+    class Identification[T](ReifiedRelation[T]):
+        pass
+
+    class Person(BaseNode):
+        name: str
+
+    class Event(BaseNode):
+        person_identified: typing.Annotated[
+            Identification[Person],
+            RelationConfig(
+                reverse_name="is_identification_of_person_in_event",
+            ),
+            ReifiedTargetConfig(
+                reverse_name="is_identified_in",
+                relation_model=IdentificationIdentifiedEntityRelation,
+            ),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    event = Event(
+        label="Big Bash",
+        person_identified=[
+            {
+                "target": [
+                    dict(
+                        label="JohnSmith",
+                        real_type="person",
+                        relation_properties=dict(certainty=1),
+                    )
+                ],
+            }
+        ],
+    )
+
+    person_identified = event.person_identified.pop()
+    target = person_identified.target.pop()
+    assert target.label == "JohnSmith"
+    assert target.relation_properties.certainty == 1
+
+
+def test_self_referencing_model():
+    class Order(BaseNode):
+        thing_ordered: typing.Annotated[
+            RelationTo[Order | Payment], RelationConfig(reverse_name="was_ordered_in")
+        ]
+
+    class Payment(BaseNode):
+        pass
+
+    ModelManager.initialise_models(depth=3)
+
+    assert "thing_ordered" in Order.model_fields
+    assert {
+        arg.__name__
+        for arg in Order.model_fields["thing_ordered"].annotation.__args__[0].__args__
+    } == {"OrderReference", "PaymentReference"}
+
+    o = Order(
+        label="the order",
+        thing_ordered=[
+            dict(
+                real_type="order",
+                label="order2",
+                uid=uuid.uuid4(),
+            ),
+        ],
+    )
+
+
+def test_incoming_relation_definitions():
+    class Pet(BaseNode):
+        pass
+
+    class Crocodile(Pet):
+        pass
+
+    class PersonPetRelation(RelationPropertiesModel):
+        purchased_when: int
+
+    class Person(BaseNode):
+        pets: typing.Annotated[
+            RelationTo[Pet],
+            RelationConfig(
+                reverse_name="is_owned_by", relation_model=PersonPetRelation
+            ),
+        ]
+
+    class Dude(Person):
+        pass
+
+    class Organisation(BaseNode):
+        pets: typing.Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_owned_by")
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert len(Pet.incoming_relations) == 1
+
+    pet_has_owner = Pet.incoming_relations["is_owned_by"]
+
+    assert {p.origin_base_class for p in pet_has_owner} == {Dude, Organisation, Person}
+
+    assert {p.origin_reference_class.__name__ for p in pet_has_owner} == {
+        "OrganisationReference",
+        "Pet__is_owned_by__PersonReference",
+        "Pet__is_owned_by__DudeReference",
+    }
+
+
+# TODO: only View class needs reverse relations...OBVS?
+
+
+def test_incoming_relations_through_embedded():
+    """
+    Incoming relations for a node should point to the outer node as well as the directly attached node.
+
+    i.e. There is no distinction between Ref and Article (Ref is not *defined* as an embedded node itself),
+    so Source.is_source_of should allow either Ref or Article as a type — Ref could always *not* be embedded...
+    """
+
+    class RefSourceProperty(RelationPropertiesModel):
+        likelihood: int
+
+    class Source(BaseNode):
+        pass
+
+    class Ref(BaseNode):
+        page_number: int
+        source: typing.Annotated[
+            RelationTo[Source],
+            RelationConfig(
+                reverse_name="is_source_of", relation_model=RefSourceProperty
+            ),
+        ]
+
+    class Article(BaseNode):
+        reference: Embedded[Ref]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Source.incoming_relations["is_source_of"]
+
+    assert len(Source.incoming_relations["is_source_of"]) == 2
+
+    is_source_of_set = Source.incoming_relations["is_source_of"]
+
+    assert {is_source_of.origin_base_class for is_source_of in is_source_of_set} == {
+        Ref,
+        Article,
+    }
+
+
+def test_incoming_relations_through_embedded_rel_to_trait():
+    class Citable(BaseNonHeritableMixin):
+        pass
+
+    class WrittenSource(BaseNode, Citable):
+        pass
+
+    class ImageSource(BaseNode, Citable):
+        pass
+
+    class Ref(BaseNode):
+        page_number: int
+        source: typing.Annotated[
+            RelationTo[Citable], RelationConfig(reverse_name="is_source_of")
+        ]
+
+    class Article(BaseNode):
+        reference: Embedded[Ref]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert WrittenSource.incoming_relations["is_source_of"]
+    assert ImageSource.incoming_relations["is_source_of"]
+
+    assert len(WrittenSource.incoming_relations["is_source_of"]) == 2
+    assert len(ImageSource.incoming_relations["is_source_of"]) == 2
+
+    assert {
+        s.origin_base_class for s in WrittenSource.incoming_relations["is_source_of"]
+    } == {Ref, Article}
+
+    assert {
+        s.origin_base_class for s in ImageSource.incoming_relations["is_source_of"]
+    } == {Ref, Article}
+
+
+def test_incoming_relations_through_double_embedded():
+    class Dog(BaseNode):
+        pass
+
+    class Cat(BaseNode):
+        pass
+
+    class Tortoise(BaseNode):
+        pass
+
+    class DoubleInnerThing(BaseNode):
+        tortoises: typing.Annotated[
+            RelationTo[Tortoise], RelationConfig(reverse_name="tortoise_has_owner")
+        ]
+
+    class InnerThing(BaseNode):
+        dogs: typing.Annotated[
+            RelationTo[Dog], RelationConfig(reverse_name="dog_has_owner")
+        ]
+        double_inner_thing: Embedded[DoubleInnerThing]
+
+    class Thing(BaseNode):
+        inner_thing: Embedded[InnerThing]
+        cats: typing.Annotated[
+            RelationTo[Cat], RelationConfig(reverse_name="cat_has_owner")
+        ]
+
+    class Person(BaseNode):
+        thing: Embedded[Thing]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Cat.incoming_relations["cat_has_owner"]
+
+    # Cat should have 2 incoming relations: Person, Embedded
+    assert len(Cat.incoming_relations["cat_has_owner"]) == 2
+    assert {c.origin_base_class for c in Cat.incoming_relations["cat_has_owner"]} == {
+        Person,
+        Thing,
+    }
+    assert {c.target_base_class for c in Cat.incoming_relations["cat_has_owner"]} == {
+        Cat
+    }
+
+    assert Dog.incoming_relations["dog_has_owner"]
+
+    # Dog should have 3 incoming relation types: Person, Embedded, InnerEmbedded
+    # assert len(Dog.incoming_relations["dog_has_owner"]) == 3
+
+    assert {c.origin_base_class for c in Dog.incoming_relations["dog_has_owner"]} == {
+        Person,
+        Thing,
+        InnerThing,
+    }
+
+    assert {
+        c.origin_reference_class.__name__
+        for c in Dog.incoming_relations["dog_has_owner"]
+    } == {"PersonReference", "ThingReference", "InnerThingReference"}
+
+    assert {c.target_base_class for c in Dog.incoming_relations["dog_has_owner"]} == {
+        Dog
+    }
+
+    assert Tortoise.incoming_relations["tortoise_has_owner"]
+
+    # Tortoise should have 4 incoming relation types: Person, Embedded, InnerEmbedded, DoubleInnerEmbedded
+    assert len(Tortoise.incoming_relations["tortoise_has_owner"]) == 4
+
+    assert {
+        c.origin_base_class for c in Tortoise.incoming_relations["tortoise_has_owner"]
+    } == {
+        Person,
+        Thing,
+        InnerThing,
+        DoubleInnerThing,
+    }

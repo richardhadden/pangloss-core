@@ -18,6 +18,8 @@ from pangloss_core_new.model_setup.config_definitions import (
     EmbeddedConfig,
     _EmbeddedConfigInstantiated,
     _EmbeddedNodeDefinition,
+    _IncomingRelationDefinition,
+    _IncomingReifiedRelationDefinition,
     _RelationConfigInstantiated,
     _OutgoingRelationDefinition,
     _OutgoingReifiedRelationDefinition,
@@ -45,9 +47,10 @@ def _get_all_subclasses(
     return set(subclasses)
 
 
-def __pg_model_instantiates_abstract_trait__(
+def __setup_model_instantiates_abstract_trait__(
     cls: type[AbstractBaseNode] | type[BaseMixin],
 ) -> bool:
+    print(cls)
     """Determines whether a Node model is a direct instantiation of a trait."""
     return issubclass(cls, BaseNonHeritableMixin) and cls.__pg_is_subclass_of_trait__()
 
@@ -77,7 +80,7 @@ def _get_concrete_node_classes(
             )
     elif issubclass(
         classes, BaseNonHeritableMixin
-    ) and __pg_model_instantiates_abstract_trait__(
+    ) and __setup_model_instantiates_abstract_trait__(
         classes  # type: ignore
     ):
         for cl in classes.__pg_real_types_with_trait__:
@@ -359,11 +362,9 @@ def __setup_create_reference_class__(
     origin_class_name: str | None = None,
     relation_properties_model: type[RelationPropertiesModel] | None = None,
 ) -> type[BaseNodeReference]:
-    print(cls)
     if not getattr(cls, "Reference", None) or not cls.Reference.base_class == cls:
         __setup_initialise_reference_class__(cls)
 
-    print(cls.Reference)
     if not relation_properties_model:
         return cls.Reference
     else:
@@ -394,7 +395,7 @@ def __setup_run_init_subclass_checks__(cls: type[AbstractBaseNode]):
 
     1. Cannot have field named `relation_properties` as this is used internally
     2. Cannot have 'Embedded' in class name"""
-    print(cls)
+
     for field_name, field in cls.model_fields.items():
         if field_name == "relation_properties":
             raise PanglossConfigError(
@@ -453,7 +454,6 @@ def __setup_update_reified_relation_annotations__(cls: type["AbstractBaseNode"])
                 reification_class.model_fields["target"].annotation,
             )
 
-            print("target class", target_class)
             (
                 annotated_target_type,
                 instantiated_target_config,
@@ -464,7 +464,7 @@ def __setup_update_reified_relation_annotations__(cls: type["AbstractBaseNode"])
                 relation_name="target",
                 origin_class_name=reification_class.__name__,
             )
-            print("here")
+
             new_reification_model: type[AbstractBaseNode] = typing.cast(
                 type[AbstractBaseNode],
                 pydantic.create_model(
@@ -490,7 +490,7 @@ def __setup_update_reified_relation_annotations__(cls: type["AbstractBaseNode"])
             )
             # TODO: initialise this properly!
             # new_reification_model.__pg_initialise_relations_and_embedded__()
-            print("now here")
+
             new_reification_model.__name__ = (
                 f"{target_class.__name__}{reification_class.__name__.split(" ")[0]}"
             )
@@ -518,12 +518,101 @@ def __setup_update_reified_relation_annotations__(cls: type["AbstractBaseNode"])
                 origin_base_class=cls,
             )
 
-            """ cls._pg_reified_relations[field_name] = _OutgoingReifiedRelationDefinition(
-                target_base_class=new_reification_model,
-                target_reference_class=__setup_create_reference_class__(
-                    new_reification_model,
-                    relation_properties_model=updated_config.relation_model,
-                ),
-                relation_config=updated_config,
-                origin_base_class=cls,
-            ) """
+
+def __setup_recurse_embeddded_nodes_for_outgoing_types__(
+    this_class: type[AbstractBaseNode],
+) -> dict[str, _OutgoingRelationDefinition]:
+    """Starting from a particular model, work recursively through embedded nodes to find
+    outgoing relationships."""
+    relations = {}
+    for (
+        embedded_field_name,
+        embedded_node_definition,
+    ) in this_class.embedded_nodes.items():
+        embedded_classes = _get_concrete_node_classes(
+            embedded_node_definition.embedded_class
+        )
+        for embedded_class in embedded_classes:
+            for (
+                relation_name,
+                relation_definition,
+            ) in embedded_class.outgoing_relations.items():
+                relations[relation_name] = relation_definition
+                for (
+                    rel_name,
+                    rel,
+                ) in __setup_recurse_embeddded_nodes_for_outgoing_types__(
+                    embedded_class
+                ).items():
+                    if not getattr(rel.origin_base_class, "is_embedded_type", False):
+                        relations[rel_name] = rel
+    return relations
+
+
+def __setup_add_incoming_relations_to_related_models__(cls: type[AbstractBaseNode]):
+    ## TODO: neither of these if statements should ever be true now, but check before removing...
+
+    for (
+        relation_name,
+        relation_definition,
+    ) in {
+        # Get outgoing relations for this class, and for all embedded classes
+        **cls.outgoing_relations,
+        **__setup_recurse_embeddded_nodes_for_outgoing_types__(cls),
+    }.items():
+        if inspect.isclass(relation_definition.target_base_class) and issubclass(
+            relation_definition.target_base_class, ReifiedRelation
+        ):
+            target_relation_config = [
+                item
+                for item in typing.get_args(
+                    relation_definition.target_base_class.__annotations__["target"]
+                )
+                if isinstance(item, _RelationConfigInstantiated)
+            ][0]
+
+            target_base = target_relation_config.relation_to_base
+
+            for target_base_class in _get_concrete_node_classes(target_base):
+                target_base_class.incoming_relations[
+                    relation_definition.relation_config.reverse_name
+                ].add(
+                    _IncomingReifiedRelationDefinition(
+                        origin_base_class=cls,
+                        origin_reference_class=__setup_create_reference_class__(
+                            cls,
+                            relation_properties_model=relation_definition.relation_config.relation_model,
+                        ),
+                        target_base_class=target_base_class,
+                        reification_class=typing.cast(
+                            type[ReifiedRelation],
+                            relation_definition.target_base_class,
+                        ),
+                        relation_to_reification_config=relation_definition.relation_config,
+                        relation_to_target_config=target_relation_config,
+                    ),
+                )
+
+        else:
+            target_base_classes = _get_concrete_node_classes(
+                relation_definition.target_base_class
+            )
+
+            for target_base_class in target_base_classes:
+                print(cls.__name__, target_base_class.__name__)
+                # print(target_base_class)
+                target_base_class.incoming_relations[
+                    relation_definition.relation_config.reverse_name
+                ].add(
+                    _IncomingRelationDefinition(
+                        origin_base_class=cls,
+                        origin_reference_class=__setup_create_reference_class__(
+                            cls,
+                            relation_properties_model=relation_definition.relation_config.relation_model,
+                            relation_name=relation_definition.relation_config.reverse_name,
+                            origin_class_name=target_base_class.__name__,
+                        ),
+                        relation_config=relation_definition.relation_config,
+                        target_base_class=target_base_class,
+                    )
+                )

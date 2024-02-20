@@ -13,14 +13,8 @@ if typing.TYPE_CHECKING:
         BaseNonHeritableMixin,
     )
     from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
-
-
-class RelationPropertiesModel(CamelModel):
-    """Parent class for relationship properties
-
-    TODO: Check types on subclassing, to make sure only viable literals allowed"""
-
-    pass
+    from relation_to import ReifiedRelation
+    from relation_properties_model import RelationPropertiesModel
 
 
 @dataclasses.dataclass
@@ -52,7 +46,7 @@ class _RelationConfigInstantiated:
 
     reverse_name: str
     relation_to_base: type["AbstractBaseNode"]
-    relation_model: typing.Optional[type[RelationPropertiesModel]] = None
+    relation_model: typing.Optional[type["RelationPropertiesModel"]] = None
     validators: typing.Optional[typing.Sequence[annotated_types.BaseMetadata]] = None
     subclasses_relation: typing.Optional[str] = None
     relation_labels: set[str] = dataclasses.field(default_factory=set)
@@ -125,3 +119,39 @@ class _EmbeddedNodeDefinition:
         "BaseMixin"
     ] | type[types.UnionType]
     embedded_config: _EmbeddedConfigInstantiated
+
+
+@dataclasses.dataclass(frozen=True)
+class _IncomingRelationDefinition:
+    origin_base_class: type["AbstractBaseNode"]
+    origin_reference_class: type["BaseNodeReference"]
+    relation_config: _RelationConfigInstantiated
+    target_base_class: type["AbstractBaseNode"]
+
+    def __hash__(self):
+        return hash(
+            "incoming_relation_definition"
+            + repr(self.origin_base_class)
+            + repr(self.origin_reference_class)
+            + repr(self.relation_config)
+        )
+
+
+@dataclasses.dataclass
+class _IncomingReifiedRelationDefinition:
+    origin_base_class: type["AbstractBaseNode"]
+    origin_reference_class: type["BaseNodeReference"]
+    relation_to_reification_config: _RelationConfigInstantiated
+    relation_to_target_config: _RelationConfigInstantiated
+    reification_class: type["ReifiedRelation"]
+    target_base_class: type["AbstractBaseNode"]
+
+    def __hash__(self):
+        return hash(
+            "incoming_reified_relation_definition"
+            + repr(self.origin_base_class)
+            + repr(self.relation_to_reification_config)
+            + repr(self.relation_to_target_config)
+            + repr(self.reification_class)
+            + repr(self.target_base_class)
+        )

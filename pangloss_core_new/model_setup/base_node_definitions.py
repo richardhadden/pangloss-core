@@ -4,10 +4,12 @@ import typing
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.config_definitions import (
     _EmbeddedNodeDefinition,
+    _IncomingRelationDefinition,
+    _IncomingReifiedRelationDefinition,
     _OutgoingRelationDefinition,
     _OutgoingReifiedRelationDefinition,
 )
-from pangloss_core_new.model_setup.models_base import BaseNodeStandardFields, CamelModel
+from pangloss_core_new.model_setup.models_base import BaseNodeStandardFields
 from pangloss_core_new.model_setup.subnode_proxy import SubNodeProxy
 from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
 
@@ -62,6 +64,10 @@ class AbstractBaseNode(BaseNodeStandardFields):
     # real_type: str = pydantic.Field(default_factory=)
     outgoing_relations: typing.ClassVar[
         dict[str, _OutgoingReifiedRelationDefinition | _OutgoingRelationDefinition]
+    ]
+
+    incoming_relations: typing.ClassVar[
+        dict[str, set[_IncomingRelationDefinition | _IncomingReifiedRelationDefinition]]
     ]
 
     def __init_subclass__(cls):

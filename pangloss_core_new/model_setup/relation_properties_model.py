@@ -6,4 +6,4 @@ class RelationPropertiesModel(CamelModel):
 
     TODO: Check types on subclassing, to make sure only viable literals allowed"""
 
-    real_type: str
+    pass
