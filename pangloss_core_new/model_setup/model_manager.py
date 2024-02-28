@@ -1,4 +1,5 @@
 from collections import defaultdict
+import typing
 
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.setup_utils import (
@@ -15,9 +16,13 @@ from pangloss_core_new.model_setup.setup_utils import (
     __setup_create_reference_class__,
 )
 
+if typing.TYPE_CHECKING:
+    from pangloss_core_new.model_setup.base_node_definitions import AbstractBaseNode
+
 
 class ModelManager:
-    _registered_models = []
+    _registered_models: list[type["AbstractBaseNode"]] = []
+    # _edit_models_cache = {}
 
     def __init__(self, *args, **kwargs):
         raise PanglossConfigError("Model Manager cannot be initialised")
@@ -29,6 +34,7 @@ class ModelManager:
     @classmethod
     def _reset(cls):
         cls._registered_models = []
+        # cls._edit_models_cache = {}
 
     @classmethod
     def initialise_models(cls, depth=2):
@@ -59,3 +65,9 @@ class ModelManager:
 
             __setup_create_reference_class__(subclass)
             subclass.model_rebuild(force=True, _parent_namespace_depth=depth)
+
+        for subclass in cls._registered_models:
+            for k, v in subclass.Edit.model_fields.items():
+                v = v.rebuild_annotation()
+
+            subclass.Edit.model_rebuild(force=True, _parent_namespace_depth=depth)

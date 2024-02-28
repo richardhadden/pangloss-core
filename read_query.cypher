@@ -1,6 +1,6 @@
 
         
-        MATCH path_to_node = (node:Event {uid: $uid})
+        MATCH path_to_node = (node:Person {uid: $uid})
         
         CALL {
             WITH node, path_to_node

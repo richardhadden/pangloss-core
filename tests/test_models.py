@@ -7,6 +7,7 @@ import annotated_types
 import pytest
 
 from pangloss_core_new.exceptions import PanglossConfigError
+
 from pangloss_core_new.model_setup.base_node_definitions import (
     BaseNonHeritableMixin,
     EditNodeBase,
@@ -27,6 +28,10 @@ from pangloss_core_new.model_setup.relation_to import (
     ReifiedTargetConfig,
 )
 from pangloss_core_new.models import BaseNode
+
+from pangloss_core_new.model_setup.setup_utils import (
+    __setup_find_cyclic_outgoing_references_for_edit__,
+)
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -1285,4 +1290,145 @@ def test_types_of_embedded():
                 real_type="dateprecise", date_precise="Last February", uid=uuid.uuid4()
             )
         ],
+    )
+
+
+def test_recursive_model():
+    class Person(BaseNode):
+        pass
+
+    class Payment(BaseNode):
+        how_much: int
+        payment_made_by: typing.Annotated[
+            RelationTo[Person], RelationConfig(reverse_name="made_payment")
+        ]
+
+    class Order(BaseNode):
+        date: int = 0
+        thing_ordered: typing.Annotated[
+            RelationTo[typing.Union[Order, Payment]],
+            RelationConfig(
+                reverse_name="was_ordered_in",
+                create_inline=True,
+                edit_inline=True,
+                delete_related_on_detach=True,
+            ),
+        ]
+        carried_out_by: typing.Annotated[
+            RelationTo[Person],
+            RelationConfig(reverse_name="carried_out_order"),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Order.model_fields
+    assert "date" in Order.model_fields
+    assert Order.model_fields["date"].default == 0
+
+    assert set(
+        typing.get_args(
+            typing.get_args(Order.Edit.model_fields["thing_ordered"].annotation)[0]
+        )
+    ) == set(
+        (
+            Order.Edit,
+            Payment.Edit,
+        )
+    )
+
+
+def test_find_cyclic_references():
+    class Person(BaseNode):
+        pass
+
+    class Payment(BaseNode):
+        how_much: int
+        payment_made_by: typing.Annotated[
+            RelationTo[Person], RelationConfig(reverse_name="made_payment")
+        ]
+
+    class Order(BaseNode):
+        date: int = 0
+        thing_ordered: typing.Annotated[
+            RelationTo[typing.Union[Order, Payment, Intermediate]],
+            RelationConfig(
+                reverse_name="was_ordered_in",
+                create_inline=True,
+                edit_inline=True,
+                delete_related_on_detach=True,
+            ),
+        ]
+        carried_out_by: typing.Annotated[
+            RelationTo[Person],
+            RelationConfig(reverse_name="carried_out_order"),
+        ]
+
+    class Intermediate(BaseNode):
+        has_person: typing.Annotated[
+            RelationTo[Order],
+            RelationConfig(
+                reverse_name="is_person_in", create_inline=True, edit_inline=True
+            ),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert __setup_find_cyclic_outgoing_references_for_edit__(Order) == set([Order])
+    """ assert __setup_find_cyclic_outgoing_references_for_edit__(Intermediate) == set(
+        [Order]
+    ) """
+
+
+def test_circular_recursive_model():
+    class Person(BaseNode):
+        pass
+
+    class Payment(BaseNode):
+        how_much: int
+        payment_made_by: typing.Annotated[
+            RelationTo[Person], RelationConfig(reverse_name="made_payment")
+        ]
+
+    class Order(BaseNode):
+        date: int = 0
+        thing_ordered: typing.Annotated[
+            RelationTo[typing.Union[Order, Payment, Intermediate]],
+            RelationConfig(
+                reverse_name="was_ordered_in",
+                create_inline=True,
+                edit_inline=True,
+                delete_related_on_detach=True,
+            ),
+        ]
+        carried_out_by: typing.Annotated[
+            RelationTo[Person],
+            RelationConfig(reverse_name="carried_out_order"),
+        ]
+
+    class Intermediate(BaseNode):
+        has_person: typing.Annotated[
+            RelationTo[Order],
+            RelationConfig(
+                reverse_name="is_person_in", create_inline=True, edit_inline=True
+            ),
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    assert Order.model_fields
+    assert "date" in Order.model_fields
+    assert Order.model_fields["date"].default == 0
+
+    assert set(
+        (m, id(m))
+        for m in typing.get_args(
+            typing.get_args(Order.Edit.model_fields["thing_ordered"].annotation)[0]
+        )
+    ) == set(
+        (m, id(m))
+        for m in (
+            Intermediate.Edit,
+            Order.Edit,
+            Payment.Edit,
+        )
     )

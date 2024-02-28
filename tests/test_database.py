@@ -22,12 +22,14 @@ from pangloss_core_new.model_setup.relation_properties_model import (
 )
 from pangloss_core_new.model_setup.embedded import Embedded
 from pangloss_core_new.models import BaseNode
+from pangloss_core_new.model_setup.base_node_definitions import BaseNonHeritableMixin
 from pangloss_core_new.model_setup.relation_to import (
     RelationTo,
     RelationConfig,
     ReifiedRelation,
     ReifiedTargetConfig,
 )
+from pangloss_core_new.exceptions import PanglossNotFoundError, PanglossCreateError
 
 FAKE_UID = uuid.UUID("a19c71f4-a844-458d-82eb-527307f89aab")
 
@@ -39,11 +41,13 @@ def reset_model_manager():
 
 @pytest_asyncio.fixture(scope="function")
 async def clear_database():
-    result = await Database.dangerously_clear_database()
+    # await Database.dangerously_clear_database()
+    try:
+        yield
+    except Exception:
+        pass
 
-    yield
-
-    # result = await Database.dangerously_clear_database()
+    await Database.dangerously_clear_database()
 
 
 class ArbitraryDatabaseClass:
@@ -509,10 +513,9 @@ async def test_write_abstract_reification():
     event_from_db = await Event.get_view(uid=event.uid)
 
 
-'''
 @pytest.mark.asyncio
 async def test_write_trait(clear_database):
-    class Purchaseable(AbstractTrait):
+    class Purchaseable(BaseNonHeritableMixin):
         price: int
 
     class Pet(BaseNode, Purchaseable):
@@ -523,7 +526,7 @@ async def test_write_trait(clear_database):
             RelationTo[Purchaseable], RelationConfig(reverse_name="purchased_by")
         ]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     pet = Pet(label="Mister Cat", price=100)
     assert pet.price == 100
@@ -567,7 +570,7 @@ async def test_read_view():
             RelationTo[Place], RelationConfig(reverse_name="is_location_of")
         ]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     place = Place(label="France")
     await place.create()
@@ -635,7 +638,7 @@ async def test_reverse_relations_through_embedded(clear_database):
     class Person(BaseNode):
         thing: Embedded[OuterThing]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     cat = Cat(label="A Cat")
     await cat.create()
@@ -713,7 +716,7 @@ async def test_get_reverse_relation_through_reified(clear_database):
             RelationConfig(reverse_name="is_pet_of"),
         ]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     pet = Pet(label="Mr Fluffy")
     await pet.create()
@@ -733,11 +736,11 @@ async def test_get_reverse_relation_through_reified(clear_database):
     person_read = await Person.get_view(uid=person.uid)
     assert person_read
 
-    assert person_read.pets.target.uid == pet.uid
+    assert person_read.pets[0].target[0].uid == pet.uid
 
     pet_read = await Pet.get_view(uid=pet.uid)
     assert pet_read
-    assert pet_read.is_pet_of.uid == person.uid
+    assert pet_read.is_pet_of[0].uid == person.uid
 
 
 @pytest.mark.asyncio
@@ -751,7 +754,7 @@ async def test_reverse_relations_do_not_propagate_indefinitely(clear_database):
     class Person(BaseNode):
         pets: Annotated[RelationTo[Pet], RelationConfig(reverse_name="pet_owned_by")]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     toy = Toy(label="Squeaky Toy")
     await toy.create()
@@ -793,7 +796,7 @@ async def test_create_relation_inline(clear_database):
             RelationConfig(reverse_name="was_ordered_by", create_inline=True),
         ]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     person = Person(label="John Smith")
     await person.create()
@@ -818,7 +821,7 @@ async def test_create_relation_inline(clear_database):
 
     order_read = await Order.get_view(uid=order_created.uid)
 
-    assert order_read.thing_ordered.label == "Making Soup"
+    assert order_read.thing_ordered[0].label == "Making Soup"
 
 
 @pytest.mark.asyncio
@@ -826,7 +829,7 @@ async def test_non_match_returns_error(clear_database):
     class Person(BaseNode):
         age: int
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     with pytest.raises(PanglossNotFoundError):
         await Person.get_view(uid=uuid.uuid4())
@@ -837,7 +840,7 @@ async def test_uid_uniqueness_constraint_violation_raises_error(clear_database):
     class Person(BaseNode):
         age: int
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     person = Person(label="John Smith", age=1)
     await person.create()
@@ -853,7 +856,7 @@ async def test_view_get_method(clear_database):
     class Person(BaseNode):
         age: int
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     person = Person(label="John Smith", age=1)
     await person.create()
@@ -882,7 +885,7 @@ async def test_edit_relation_inline(clear_database):
             ),
         ]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     person = Person(label="John Smith")
     await person.create()
@@ -907,9 +910,10 @@ async def test_edit_relation_inline(clear_database):
 
     order_update_view = await Order.get_edit(uid=order.uid)
 
-    assert order_update_view.thing_ordered.date == "February"
+    assert order_update_view.thing_ordered[0].date == "February"
     assert (
-        order_update_view.thing_ordered.person_carrying_out_activity.uid == person.uid
+        order_update_view.thing_ordered[0].person_carrying_out_activity[0].uid
+        == person.uid
     )
 
     order_update_view = await Order.Edit.get(uid=order.uid)
@@ -921,7 +925,7 @@ async def test_update_properties(clear_database):
         age: int
         name: str
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     person = Person(label="John Smith", name="John Smith", age=100)
     await person.create()
@@ -957,7 +961,7 @@ async def test_update_basic_relations(clear_database):
     class Person(BaseNode):
         pets: Annotated[RelationTo[Pet], RelationConfig(reverse_name="belongs_to")]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     fluffle = Pet(label="Fluffle")
     await fluffle.create()
@@ -1058,7 +1062,7 @@ async def test_update_inline_editable_relation(clear_database):
             ),
         ]
 
-    ModelManager.initialise_models(_models_defined_in_test=True)
+    ModelManager.initialise_models(depth=3)
 
     # Initiate these things as nice containers
     fluffle = Pet(label="Fluffle")
@@ -1128,11 +1132,11 @@ async def test_update_inline_editable_relation(clear_database):
 
     # By replacing Fluffle and Wuffle with Truffle, these two should
     # now be deleted
-    get_missing_fluffle = await Database.get(uid=fluffle.uid)
-    assert not get_missing_fluffle
+    with pytest.raises(PanglossNotFoundError):
+        await Pet.View.get(uid=fluffle.uid)
 
-    get_missing_wuffle = await Database.get(uid=wuffle.uid)
-    assert not get_missing_wuffle
+    with pytest.raises(PanglossNotFoundError):
+        await Pet.View.get(uid=wuffle.uid)
 
     # TODO: delete dependents!
 
@@ -1165,21 +1169,46 @@ async def test_update_double_embedded_objects():
             RelationTo[Person], RelationConfig(reverse_name="carried_out_order")
         ]
 
-    person = Person(label="John Smith")
-    await person.create()
+    ModelManager.initialise_models(depth=3)
+
+    john_smith = Person(label="John Smith")
+    await john_smith.create()
+
+    toby_jones = Person(label="Toby Jones")
+    await toby_jones.create()
+
+    olive_branch = Person(label="Olive Branch")
+    await olive_branch.create()
 
     order = Order(
-        label="John Smith ordered to make payment",
+        label="John Smith orders Toby Jones to order Olive Branch to make a payment",
         carried_out_by=[
-            {"uid": person.uid, "label": person.label, "real_type": "person"}
+            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "person"}
         ],
         thing_ordered=[
             {
-                "label": "John Smith makes payment",
-                "real_type": "payment",
-                "how_much": 1,
-                "payment_made_by": [
-                    {"uid": person.uid, "label": person.label, "real_type": "person"}
+                "label": "Toby Jones orders Olive Branch to make a payment",
+                "real_type": "order",
+                "carried_out_by": [
+                    {
+                        "uid": toby_jones.uid,
+                        "label": toby_jones.label,
+                        "real_type": "person",
+                    }
+                ],
+                "thing_ordered": [
+                    {
+                        "label": "Olive Branch makes payment",
+                        "real_type": "payment",
+                        "how_much": 1,
+                        "payment_made_by": [
+                            {
+                                "uid": olive_branch.uid,
+                                "label": olive_branch.label,
+                                "real_type": "person",
+                            }
+                        ],
+                    }
                 ],
             }
         ],
@@ -1188,73 +1217,43 @@ async def test_update_double_embedded_objects():
     await order.create()
 
     order_to_edit = Order.Edit(
-        label="John Smith ordered to make payment",
+        uid=order.uid,
+        label="John Smith orders Toby Jones to order Olive Branch to make a payment",
         carried_out_by=[
-            {"uid": person.uid, "label": person.label, "real_type": "person"}
+            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "person"}
         ],
         thing_ordered=[
             {
-                "label": "John Smith makes payment",
-                "real_type": "payment",
-                "how_much": 2,
-                "payment_made_by": [
-                    {"uid": person.uid, "label": person.label, "real_type": "person"}
+                "uid": order.thing_ordered[0].uid,
+                "label": "Toby Jones orders Olive Branch to make a payment",
+                "carried_out_by": [
+                    {
+                        "uid": toby_jones.uid,
+                        "label": toby_jones.label,
+                        "real_type": "person",
+                    }
+                ],
+                "thing_ordered": [
+                    {
+                        "uid": order.thing_ordered[0].thing_ordered[0].uid,
+                        "label": "Olive Branch makes payment",
+                        "real_type": "payment",
+                        "how_much": 1,
+                        "payment_made_by": [
+                            {
+                                "uid": olive_branch.uid,
+                                "label": olive_branch.label,
+                                "real_type": "person",
+                            }
+                        ],
+                    }
                 ],
             }
         ],
     )
 
+    await order_to_edit.write_edit()
 
-
-@pytest.mark.asyncio
-async def test_massive_writes(clear_database):
-    """
-    TODO: DELETE! -- pointless test to make sure we can write a load of items
-    and return reverse in a reasonable time"""
-
-    class Person(BaseNode):
-        pass
-
-    class Activity(BaseNode):
-        person_performing_activity: RelationTo[
-            Person, RelationConfig(reverse_name="activity_performed_by")
-        ]
-        person_coughing_up_the_money: RelationTo[
-            Person, RelationConfig(reverse_name="coughed_up_money_for")
-        ]
-
-    person = Person(label="John Smith")
-    await person.create()
-
-    import asyncio
-
-    async def async_range(count):
-        for i in range(count):
-            yield (i)
-            await asyncio.sleep(0.0)
-
-    async for i in async_range(500):
-        activity = Activity(
-            label=f"Activity {i}",
-            person_performing_activity=[
-                {"uid": person.uid, "label": "John Smith", "real_type": "person"}
-            ],
-            person_coughing_up_the_money=[
-                {"uid": person.uid, "label": "John Smith", "real_type": "person"}
-            ],
-        )
-        await activity.create()
-
-    import datetime
-
-    start = datetime.datetime.now()
-    person = await Person.View.get(uid=person.uid)
-    print("TIME:", datetime.datetime.now() - start)
-
-    for p in person.coughed_up_money_for:
-        print(p)
-    assert 2 == 1
-'''
 
 """
 Database types:

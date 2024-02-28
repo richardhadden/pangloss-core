@@ -1,17 +1,25 @@
 
-        MATCH (xa4fe4a {uid: $x759ddb})
+        MATCH (xf56712 {uid: $x4d943e})
 
-        MATCH (xb89d01 {uid: $x22e588})
-        CREATE (x5ef7e1:Event:BaseNode {uid: $x3cb1c0, label: $xc9338c, real_type: $x1bf7a7})
+        MATCH (x3d1e45 {uid: $xf7770b})
 
-        CREATE (x5ef7e1)-[:WHEN {reverse_name: $x183564, relation_labels: $x401321}]->(xa4fe4a)
+        MATCH (x1dc427 {uid: $xa241b2})
+        CREATE (x391f2c:Order:BaseNode {uid: $xbb8290, label: $x12f201, real_type: $xb99bc2})
 
-        CREATE (xb1c9e6:PersonIdentification:ReifiedRelation {uid: $x771773, identification_type: $x2350d8, real_type: $xab6df6})
+        CREATE (x108762:Order:BaseNode:CreateInline:ReadInline:EditInline:DeleteDetach {uid: $x9d0542, label: $x1eb277, real_type: $x306f18})
 
-        CREATE (xb1c9e6)-[:TARGET {reverse_name: $xa750b4, relation_labels: $xbf1f61, certainty: $x2cead2}]->(xb89d01)
+        CREATE (x98eb47:Payment:BaseNode:CreateInline:ReadInline:EditInline:DeleteDetach {uid: $x10c8e4, label: $xe86dd6, how_much: $xef5a81, real_type: $x75084f})
 
-        CREATE (x5ef7e1)-[:PERSON_IDENTIFIED {reverse_name: $x032361, relation_labels: $xced512}]->(xb1c9e6)
+        CREATE (x98eb47)-[:PAYMENT_MADE_BY {reverse_name: $x87c427, relation_labels: $xf26750}]->(xf56712)
+
+        CREATE (x108762)-[:THING_ORDERED]->(x98eb47)
+
+        CREATE (x108762)-[:CARRIED_OUT_BY {reverse_name: $xe640e3, relation_labels: $xdbac4f}]->(x3d1e45)
+
+        CREATE (x391f2c)-[:THING_ORDERED]->(x108762)
+
+        CREATE (x391f2c)-[:CARRIED_OUT_BY {reverse_name: $x10aac3, relation_labels: $x223b0a}]->(x1dc427)
         
         
-        return x5ef7e1{.uid, .label, .real_type}
-        {'x3cb1c0': '40d49564-64ed-4be4-a950-4c6fd640f11d', 'xc9338c': 'Big Bash', 'x1bf7a7': 'event', 'x183564': 'is_day_of_event', 'x401321': [], 'x759ddb': '4f870d10-ea9a-487c-a5c2-8d897c0ccbf4', 'x771773': 'dd8fa368-cc35-4bcb-aaf2-2dc51775f987', 'x2350d8': 'visual', 'xab6df6': 'personidentification[test_write_abstract_reification.<locals>.person]', 'xa750b4': 'is_identified_in', 'xbf1f61': [], 'x2cead2': 1, 'x22e588': '5e486d1f-ec58-4f49-877d-cdf9133c7db1', 'x032361': 'is_identification_of_person_in_event', 'xced512': []}
+        return x391f2c{.uid, .label, .real_type}
+        {'xbb8290': '625876b9-9bc8-4df6-ad2e-737cbeb206b8', 'x12f201': 'John Smith orders Toby Jones to order Olive Branch to make a payment', 'xb99bc2': 'order', 'x9d0542': 'de4f0fcd-54cf-474a-b2d6-2ec847826f13', 'x1eb277': 'Toby Jones orders Olive Branch to make a payment', 'x306f18': 'order', 'x10c8e4': '7bac351f-e409-4ab1-9d7a-39a5a6dcb74a', 'xe86dd6': 'Olive Branch makes payment', 'xef5a81': 1, 'x75084f': 'payment', 'x87c427': 'made_payment', 'xf26750': [], 'x4d943e': 'fc0f0ccb-c8cd-4ac3-980e-44a77a75b3a3', 'xe640e3': 'carried_out_order', 'xdbac4f': [], 'xf7770b': '113b5d69-c2fc-455c-8a54-c4f422af041d', 'x10aac3': 'carried_out_order', 'x223b0a': [], 'xa241b2': '54427fd0-ba1c-499a-9187-631a94eecd7a'}

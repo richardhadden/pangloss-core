@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-import secrets
+import inspect
 import typing
 import uuid
 from typing import Any
+from pangloss_core_new.model_setup.base_node_definitions import (
+    EditNodeBase,
+    EmbeddedNodeBase,
+)
 
 
 if typing.TYPE_CHECKING:
     from pangloss_core_new.model_setup.base_node_definitions import (
-        EditNodeBase,
         AbstractBaseNode,
     )
 
-from pangloss_core_new.model_setup.base_node_definitions import EmbeddedNodeBase
 from pangloss_core_new.model_setup.relation_to import ReifiedRelation
 
 
@@ -162,7 +164,10 @@ def build_write_query_and_params_dict(
             params_dict = {**params_dict, **embedded_params_dict}
 
     for relation_name, relation in node.outgoing_relations.items():
-        if issubclass(relation.target_base_class, ReifiedRelation):
+        # print(">>>>", relation.target_base_class)
+        if inspect.isclass(relation.target_base_class) and issubclass(
+            relation.target_base_class, ReifiedRelation
+        ):
             for related_reification in getattr(node, relation_name):
                 (
                     reified_node_identifier,
@@ -272,10 +277,17 @@ def read_query(cls: type[AbstractBaseNode]):
             WITH node
             CALL {
                 WITH node
-                OPTIONAL MATCH (node)<-[reverse_relation]-(x WHERE (x:Embedded OR x:ReifiedRelation))(()<--()){ 0, }()<--(related_node)
+                OPTIONAL MATCH (node)<--(x WHERE (x:ReifiedRelation))(()<--()){ 0, }()<-[reverse_relation]-(related_node)
                 WHERE NOT related_node:Embedded AND NOT related_node:ReifiedRelation
                 WITH reverse_relation.reverse_name AS reverse_relation_type, collect(related_node{ .uid, .label, .real_type }) AS related_node_data
-                RETURN collect({ t: reverse_relation_type, related_node_data: related_node_data }) AS via_intermediate
+                RETURN collect({ t: reverse_relation_type, related_node_data: related_node_data }) AS via_reified
+            }
+            CALL {
+                WITH node
+                OPTIONAL MATCH (node)<-[reverse_relation]-(x WHERE (x:Embedded))(()<--()){ 0, }()<--(related_node)
+                WHERE NOT related_node:Embedded AND NOT related_node:ReifiedRelation
+                WITH reverse_relation.reverse_name AS reverse_relation_type, collect(related_node{ .uid, .label, .real_type }) AS related_node_data
+                RETURN collect({ t: reverse_relation_type, related_node_data: related_node_data }) AS via_embedded
             }
             CALL {
                 WITH node
@@ -284,7 +296,7 @@ def read_query(cls: type[AbstractBaseNode]):
                 WITH reverse_relation.reverse_name AS reverse_relation_type, collect(related_node{ .uid, .label, .real_type }) AS related_node_data
                 RETURN collect({ t: reverse_relation_type, related_node_data: related_node_data }) AS direct_incoming
             }
-            RETURN REDUCE(s = { }, item IN apoc.coll.flatten([direct_incoming, via_intermediate]) | apoc.map.setEntry(s, item.t, item.related_node_data)) AS reverse_relations
+            RETURN REDUCE(s = { }, item IN apoc.coll.flatten([direct_incoming, via_reified, via_embedded]) | apoc.map.setEntry(s, item.t, item.related_node_data)) AS reverse_relations
         }
 
         WITH value, node, reverse_relations
@@ -320,16 +332,21 @@ def create_set_statement_for_properties(
 
 
 def build_update_related_inline_editable_query(
-    node, relation_name, start_node_identifier, delete_node_on_detach=False
+    node: EditNodeBase,
+    relation_name,
+    start_node_identifier,
+    delete_node_on_detach=False,
 ) -> tuple[str, dict[str, Any]]:
+    print("\n\n========\n")
+    print("Buliding for:", relation_name, node.__class__.__name__)
+
     related_item_array_identifier = get_unique_string()
 
     related_items = getattr(node, relation_name, [])
-    related_items_dict = [
-        {key: convert_type_for_writing(value) for key, value in dict(item).items()}
-        for item in related_items
-    ]
+    print(node.outgoing_relations[relation_name].relation_config.edit_inline)
+    related_items_dict = [{"uid": str(item.uid)} for item in related_items]
 
+    print(related_items_dict)
     params = {related_item_array_identifier: related_items_dict}
 
     # print("----")
@@ -355,7 +372,7 @@ def build_update_related_inline_editable_query(
                 WHERE NOT ({start_node_identifier})-[:{relation_name.upper()}]->(node_to_relate)
                 CREATE ({start_node_identifier})-[:{relation_name.upper()}]->(node_to_relate)
         }}
-        CALL {{ // {relation_name} : If not in list but is related, delete relation
+        CALL {{ // {relation_name} : If not in list but is currently related, delete relation
             WITH {start_node_identifier}
             WITH {start_node_identifier}, [x IN ${related_item_array_identifier} | x.uid] AS updated_related_items_uids
             MATCH ({start_node_identifier})-[existing_rel_to_delete:{relation_name.upper()}]->(currently_related_item)
@@ -531,7 +548,7 @@ def build_update_node_query_and_params(
     return query, params
 
 
-def update_query(node: EditNodeBase) -> tuple[str, dict[str, Any]]:
+def update_query(node: AbstractBaseNode) -> tuple[str, dict[str, Any]]:
     node_identifier = get_unique_string()
     node_uid_param = get_unique_string()
 

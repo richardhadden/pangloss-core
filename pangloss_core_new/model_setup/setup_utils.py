@@ -9,11 +9,14 @@ import pydantic
 
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.base_node_definitions import (
+    EditNodeBase,
+    EmbeddedNodeBase,
+)
+
+from pangloss_core_new.model_setup.base_node_definitions import (
     AbstractBaseNode,
     BaseMixin,
     BaseNonHeritableMixin,
-    EditNodeBase,
-    EmbeddedNodeBase,
     ViewNodeBase,
 )
 from pangloss_core_new.model_setup.config_definitions import (
@@ -355,9 +358,6 @@ def __setup_initialise_reference_class__(cls):
         )
 
 
-existing_reference_classes = {}
-
-
 def __setup_create_reference_class__(
     cls: type[AbstractBaseNode],
     relation_name: str | None = None,
@@ -373,19 +373,15 @@ def __setup_create_reference_class__(
         reference_model_name = (
             f"{origin_class_name}__{relation_name}__{cls.__name__}Reference"
         )
-        if reference_model_name in existing_reference_classes:
-            return existing_reference_classes[reference_model_name]
 
-        else:
-            new_reference_class = pydantic.create_model(
-                reference_model_name,
-                __base__=BaseNodeReference,
-                base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
-                real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
-                relation_properties=(relation_properties_model, ...),
-            )
-            existing_reference_classes[reference_model_name] = new_reference_class
-            return new_reference_class
+        new_reference_class = pydantic.create_model(
+            reference_model_name,
+            __base__=BaseNodeReference,
+            base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
+            real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+            relation_properties=(relation_properties_model, ...),
+        )
+        return new_reference_class
 
 
 def __setup_delete_indirect_non_heritable_mixin_fields__(
@@ -702,7 +698,7 @@ def __setup_add_all_property_fields__(cls: type[AbstractBaseNode]) -> None:
     cls.property_fields = property_fields
 
 
-def __setup_construct_view_type__(cls: AbstractBaseNode):
+def __setup_construct_view_type__(cls: type[AbstractBaseNode]):
     """Constructs a view type on the class."""
     # print(cls.__name__, cls.incoming_relations)
     incoming_model_fields = {}
@@ -738,29 +734,72 @@ def __setup_construct_view_type__(cls: AbstractBaseNode):
     cls.View = view_model  # type: ignore
 
 
+def __setup_find_cyclic_outgoing_references_for_edit__(cls: type[AbstractBaseNode]):
+    cyclic = set()
+    for relation_name, relation in cls.outgoing_relations.items():
+        if relation.relation_config.edit_inline:
+            for concrete_related_type in _get_concrete_node_classes(
+                relation.target_base_class, include_subclasses=True
+            ):  # Get all the possible related types
+                if concrete_related_type == cls:  # Self reference
+                    cyclic.add(concrete_related_type)
+                else:
+                    for (
+                        inner_relation_name,
+                        inner_relation,
+                    ) in concrete_related_type.outgoing_relations.items():
+                        for inner_concrete_related_type in _get_concrete_node_classes(
+                            inner_relation.target_base_class, include_subclasses=True
+                        ):
+                            if inner_concrete_related_type in cyclic:
+                                return cyclic
+                            if inner_concrete_related_type == cls or issubclass(
+                                inner_concrete_related_type, cls
+                            ):
+                                # print("adding", inner_concrete_related_type)
+                                cyclic.add(inner_concrete_related_type)
+
+                            else:
+                                # print("recurse on", inner_concrete_related_type)
+                                cyclic.update(
+                                    __setup_find_cyclic_outgoing_references_for_edit__(
+                                        inner_concrete_related_type
+                                    )
+                                )
+
+    return cyclic
+
+
 def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
-    # print("Constructing edit type for", cls.__name__)
+    if getattr(cls, "Edit", False) and cls.Edit.__name__ == f"{cls.__name__}Edit":
+        return cls.Edit
     outgoing_relation_new_defs = {}
     for relation_name, relation in cls.outgoing_relations.items():
         if relation.relation_config.edit_inline:
-            all_related_types = []
+            all_related_types = set()
+
             for concrete_related_type in _get_concrete_node_classes(
                 relation.target_base_class, include_subclasses=True
             ):
-                all_related_types.append(
-                    __setup_construct_edit_type__(concrete_related_type)
-                )
+                if (
+                    concrete_related_type
+                    in __setup_find_cyclic_outgoing_references_for_edit__(cls)
+                ):
+                    all_related_types.add(f"{concrete_related_type.__name__}Edit")
+                else:
+                    m = __setup_construct_edit_type__(concrete_related_type)
 
-            all_related_types = tuple(all_related_types)
+                    all_related_types.add(m)
 
             outgoing_relation_new_defs[relation_name] = (
                 typing.Annotated[
-                    list[typing.Union[*all_related_types]],  # type: ignore
+                    list[typing.Union[*tuple(all_related_types)]],  # type: ignore
                     relation.relation_config.validators,
                     relation.relation_config,
                 ],
                 pydantic.Field(default_factory=list),
             )
+
         else:
             # print(typing.get_args(cls.model_fields[relation_name].annotation))
             all_related_types = []
@@ -791,7 +830,9 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
     for property_name, property in cls.property_fields.items():
         edit_model.model_fields[property_name] = property  # type: ignore
 
-    edit_model.model_rebuild(force=True)
+    for k, v in edit_model.model_fields.items():
+        v = v.rebuild_annotation()
 
     cls.Edit = edit_model
+
     return edit_model

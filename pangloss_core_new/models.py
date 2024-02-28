@@ -1,5 +1,8 @@
 import uuid
 
+import neo4j.exceptions
+from pangloss_core_new.model_setup.base_node_definitions import EditNodeBase
+
 from pangloss_core_new.model_setup.base_node_definitions import (
     AbstractBaseNode,
     ViewNodeBase,
@@ -8,7 +11,7 @@ from pangloss_core_new.model_setup.model_manager import ModelManager
 from pangloss_core_new.database import Transaction, write_transaction, read_transaction
 from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
 from pangloss_core_new.cypher_utils import cypher
-from pangloss_core_new.exceptions import PanglossNotFoundError
+from pangloss_core_new.exceptions import PanglossNotFoundError, PanglossCreateError
 
 
 class BaseNode(AbstractBaseNode):
@@ -20,13 +23,7 @@ class BaseNode(AbstractBaseNode):
 
     @classmethod
     @read_transaction
-    async def get_view(
-        cls, tx: Transaction, uid: uuid.UUID
-    ) -> type[ViewNodeBase] | None:
-        # Added some query optimisation: if cls has no outgoing relations or embedded nodes defined,
-        # there should be no need to look up these paths.
-        # TODO: Further optimisation: if no paths need to be followed at all, there is no need to do this
-        # path unpacking business at all!
+    async def get_view(cls, tx: Transaction, uid: uuid.UUID) -> ViewNodeBase | None:
         query = cypher.read_query(cls)
 
         with open("read_query.cypher", "w") as f:
@@ -34,7 +31,7 @@ class BaseNode(AbstractBaseNode):
 
         result = await tx.run(query, {"uid": str(uid)})  # type: ignore
         record = await result.value()
-        print(record)
+
         if len(record) == 0:
             raise PanglossNotFoundError(f'<{cls.__name__} uid="{uid}"> not found')
 
@@ -69,13 +66,45 @@ class BaseNode(AbstractBaseNode):
         # try:
         # Annoyingly, need override this type hint as Transaction.run takes type LiteralString
         # (not str), which means we cannot dynamically construct the query string
-        result = await tx.run(query, params_dict)  # type:ignore
+        try:
+            result = await tx.run(query, params_dict)  # type:ignore
 
-        record = await result.value()
-        print("======")
-        print("Creating", self.__class__.__name__)
+            record = await result.value()
+        except neo4j.exceptions.ConstraintError as e:
+            raise PanglossCreateError(e.message)
+
         # print(record)
         return self.Reference(**record[0])
         # except Exception as e:
         #    print(e)
         #    raise PanglossCreateError(message=e)
+
+    @classmethod
+    @read_transaction
+    async def get_edit(cls, tx: Transaction, uid: uuid.UUID) -> EditNodeBase:
+        # Added some query optimisation: if cls has no outgoing relations or embedded nodes defined,
+        # there should be no need to look up these paths.
+        # TODO: Further optimisation: if no paths need to be followed at all, there is no need to do this
+        # path unpacking business at all!
+        query = cypher.read_query(cls)
+
+        with open("read_query.cypher", "w") as f:
+            f.write(query)
+
+        result = await tx.run(query, {"uid": str(uid)})  # type: ignore
+        record = await result.value()
+
+        if len(record) == 0:
+            raise PanglossNotFoundError(f'<{cls.__name__} uid="{uid}"> not found')
+
+        return cls.Edit(**record[0])
+
+    @staticmethod
+    @write_transaction
+    async def _write_edit(item, tx: Transaction) -> None:
+        query, params = cypher.update_query(item)
+        with open("update_query.cypher", "w") as f:
+            f.write(query)
+            f.write("\n\n\n\n")
+            f.write(str(params))
+        await tx.run(query, params)  # type: ignore

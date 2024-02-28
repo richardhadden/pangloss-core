@@ -1,5 +1,6 @@
 import inspect
 import typing
+import uuid
 
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.config_definitions import (
@@ -19,11 +20,18 @@ class EmbeddedNodeBase(SubNodeProxy):
 
 
 class ViewNodeBase(SubNodeProxy):
-    pass
+    @classmethod
+    def get(cls, uid: uuid.UUID) -> typing.Awaitable[typing.Self | None]:
+        return cls.base_class.get_view(uid)  # type: ignore
 
 
 class EditNodeBase(SubNodeProxy):
-    pass
+    @classmethod
+    def get(cls, uid: uuid.UUID) -> typing.Awaitable[typing.Self | None]:
+        return cls.base_class.get_edit(uid)  # type: ignore
+
+    def write_edit(self) -> typing.Awaitable[None]:
+        return self.base_class._write_edit(self)  # type: ignore
 
 
 class BaseNonHeritableMixin:
