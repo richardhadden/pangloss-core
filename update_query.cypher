@@ -1,123 +1,125 @@
-MATCH (xde98e8 {uid: $x6ec5de}) // Order, 80913483-1fac-414d-b2aa-28b204b52366, Bertie Wooster orders Lucky Jim to order Miss Marple to write a book
+MATCH (x8a4da1 {uid: $x04df6e}) // Order, 68ce78c9-046d-4279-9313-e612f9963c8c, Bertie Wooster orders Lucky Jim to order Miss Marple to write a book
 
         
         
         
-        MERGE (x6529de:Order:BaseNode:CreateInline:ReadInline:EditInline:DeleteDetach {uid: $xbd3bad}) // Order, c694975a-07f4-4b3c-bcd2-1e725760d3d0, Lucky Jim orders Miss Marple to write a book
+        MERGE (x157b2a:Order:BaseNode:CreateInline:ReadInline:EditInline:DeleteDetach {uid: $xf535e6}) // Order, 3cc4d105-f078-47d8-bdeb-2aedaf904373, Lucky Jim orders Miss Marple to write a book
         ON CREATE
        
             
-    SET x6529de = $xddf2b8 // {'uid': 'c694975a-07f4-4b3c-bcd2-1e725760d3d0', 'label': 'Lucky Jim orders Miss Marple to write a book', 'real_type': 'order'}
+    SET x157b2a = $x020f3a // {'uid': '3cc4d105-f078-47d8-bdeb-2aedaf904373', 'label': 'Lucky Jim orders Miss Marple to write a book', 'real_type': 'order'}
     
             
         ON MATCH
             
-    SET x6529de = $xddf2b8 // {'uid': 'c694975a-07f4-4b3c-bcd2-1e725760d3d0', 'label': 'Lucky Jim orders Miss Marple to write a book', 'real_type': 'order'}
+    SET x157b2a = $x020f3a // {'uid': '3cc4d105-f078-47d8-bdeb-2aedaf904373', 'label': 'Lucky Jim orders Miss Marple to write a book', 'real_type': 'order'}
     
         
-        WITH x6529de, xde98e8 // <<
+        WITH x157b2a, x8a4da1 // <<
           
 
         
         
         
-        MERGE (x772920:WritingBook:BaseNode:CreateInline:ReadInline:EditInline:DeleteDetach {uid: $x4ed036}) // WritingBook, 5961ea0d-6b92-46c3-abb4-84cb6aa72b8e, Miss Marple writes book
+        MERGE (xea9d15:WritingBook:BaseNode:CreateInline:ReadInline:EditInline:DeleteDetach {uid: $xc9498b}) // WritingBook, 37bc1fff-f573-420b-aee3-079d3e9548c2, Miss Marple writes book
         ON CREATE
        
             
-    SET x772920 = $x4b6447 // {'uid': '5961ea0d-6b92-46c3-abb4-84cb6aa72b8e', 'label': 'Miss Marple writes book', 'something': '', 'real_type': 'writingbook'}
+    SET xea9d15 = $x076286 // {'uid': '37bc1fff-f573-420b-aee3-079d3e9548c2', 'label': 'Miss Marple writes book', 'something': '', 'real_type': 'writingbook'}
     
             
         ON MATCH
             
-    SET x772920 = $x4b6447 // {'uid': '5961ea0d-6b92-46c3-abb4-84cb6aa72b8e', 'label': 'Miss Marple writes book', 'something': '', 'real_type': 'writingbook'}
+    SET xea9d15 = $x076286 // {'uid': '37bc1fff-f573-420b-aee3-079d3e9548c2', 'label': 'Miss Marple writes book', 'something': '', 'real_type': 'writingbook'}
     
         
-        WITH x6529de, x772920, xde98e8 // <<
+        WITH x157b2a, xea9d15, x8a4da1 // <<
           
-    // ('WritingBookEdit', UUID('5961ea0d-6b92-46c3-abb4-84cb6aa72b8e'), 'Miss Marple writes book')
+    // ('WritingBookEdit', UUID('37bc1fff-f573-420b-aee3-079d3e9548c2'), 'Miss Marple writes book')
     CALL { // Attach existing node if it is not attached
-        WITH x772920
-        UNWIND $xe06675 AS updated_related_item_uid
+        WITH xea9d15
+        UNWIND $x74b66b AS updated_related_item_uid
             MATCH (node_to_relate {uid: updated_related_item_uid})
-            WHERE NOT (x772920)-[:WRITTEN_BY]->(node_to_relate)
-            CREATE (x772920)-[:WRITTEN_BY]->(node_to_relate)
+            WHERE NOT (xea9d15)-[:WRITTEN_BY]->(node_to_relate)
+            CREATE (xea9d15)-[:WRITTEN_BY]->(node_to_relate)
     }
-    // ('WritingBookEdit', UUID('5961ea0d-6b92-46c3-abb4-84cb6aa72b8e'), 'Miss Marple writes book')
+    // ('WritingBookEdit', UUID('37bc1fff-f573-420b-aee3-079d3e9548c2'), 'Miss Marple writes book')
     CALL { // If not in list but is related, delete relation
-        WITH x772920
-        MATCH (x772920)-[existing_rel_to_delete:WRITTEN_BY]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $xe06675
+        WITH xea9d15
+        MATCH (xea9d15)-[existing_rel_to_delete:WRITTEN_BY]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $x74b66b
         DELETE existing_rel_to_delete
     }
     
         
         
         
-        MERGE (x6529de)-[:THING_ORDERED]->(x772920)
+        MERGE (x157b2a)-[:THING_ORDERED]->(xea9d15)
         
 
-      WITH x6529de, x772920, xde98e8 // <<<<
+      WITH x157b2a, xea9d15, x8a4da1 // <<<<
         
-    WITH x6529de, x772920, xde98e8 // <<<<
+    WITH x157b2a, xea9d15, x8a4da1 // <<<<
         
     CALL { // cleanup from Lucky Jim orders Miss Marple to write a book
-       WITH x6529de
-       MATCH (x6529de)-[existing_rel_to_delete:THING_ORDERED]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $x0c785b
+       WITH x157b2a
+       MATCH (x157b2a)-[existing_rel_to_delete:THING_ORDERED]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $xc3a0c5
         DELETE existing_rel_to_delete
+        DETACH DELETE currently_related_item
     }
-    // ('OrderEdit', UUID('c694975a-07f4-4b3c-bcd2-1e725760d3d0'), 'Lucky Jim orders Miss Marple to write a book')
+    // ('OrderEdit', UUID('3cc4d105-f078-47d8-bdeb-2aedaf904373'), 'Lucky Jim orders Miss Marple to write a book')
     CALL { // Attach existing node if it is not attached
-        WITH x6529de
-        UNWIND $x890768 AS updated_related_item_uid
+        WITH x157b2a
+        UNWIND $xb3732e AS updated_related_item_uid
             MATCH (node_to_relate {uid: updated_related_item_uid})
-            WHERE NOT (x6529de)-[:CARRIED_OUT_BY]->(node_to_relate)
-            CREATE (x6529de)-[:CARRIED_OUT_BY]->(node_to_relate)
+            WHERE NOT (x157b2a)-[:CARRIED_OUT_BY]->(node_to_relate)
+            CREATE (x157b2a)-[:CARRIED_OUT_BY]->(node_to_relate)
     }
-    // ('OrderEdit', UUID('c694975a-07f4-4b3c-bcd2-1e725760d3d0'), 'Lucky Jim orders Miss Marple to write a book')
+    // ('OrderEdit', UUID('3cc4d105-f078-47d8-bdeb-2aedaf904373'), 'Lucky Jim orders Miss Marple to write a book')
     CALL { // If not in list but is related, delete relation
-        WITH x6529de
-        MATCH (x6529de)-[existing_rel_to_delete:CARRIED_OUT_BY]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $x890768
+        WITH x157b2a
+        MATCH (x157b2a)-[existing_rel_to_delete:CARRIED_OUT_BY]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $xb3732e
         DELETE existing_rel_to_delete
     }
     
         
         
         
-        MERGE (xde98e8)-[:THING_ORDERED]->(x6529de)
+        MERGE (x8a4da1)-[:THING_ORDERED]->(x157b2a)
         
 
-      WITH x6529de, xde98e8 // <<<<
+      WITH x157b2a, x8a4da1 // <<<<
         
-    WITH x6529de, xde98e8 // <<<<
+    WITH x157b2a, x8a4da1 // <<<<
         
     CALL { // cleanup from Bertie Wooster orders Lucky Jim to order Miss Marple to write a book
-       WITH xde98e8
-       MATCH (xde98e8)-[existing_rel_to_delete:THING_ORDERED]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $xb5c109
+       WITH x8a4da1
+       MATCH (x8a4da1)-[existing_rel_to_delete:THING_ORDERED]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $xd4eeeb
         DELETE existing_rel_to_delete
+        DETACH DELETE currently_related_item
     }
-    // ('OrderEdit', UUID('80913483-1fac-414d-b2aa-28b204b52366'), 'Bertie Wooster orders Lucky Jim to order Miss Marple to write a book')
+    // ('OrderEdit', UUID('68ce78c9-046d-4279-9313-e612f9963c8c'), 'Bertie Wooster orders Lucky Jim to order Miss Marple to write a book')
     CALL { // Attach existing node if it is not attached
-        WITH xde98e8
-        UNWIND $x6036fb AS updated_related_item_uid
+        WITH x8a4da1
+        UNWIND $xd9d7d1 AS updated_related_item_uid
             MATCH (node_to_relate {uid: updated_related_item_uid})
-            WHERE NOT (xde98e8)-[:CARRIED_OUT_BY]->(node_to_relate)
-            CREATE (xde98e8)-[:CARRIED_OUT_BY]->(node_to_relate)
+            WHERE NOT (x8a4da1)-[:CARRIED_OUT_BY]->(node_to_relate)
+            CREATE (x8a4da1)-[:CARRIED_OUT_BY]->(node_to_relate)
     }
-    // ('OrderEdit', UUID('80913483-1fac-414d-b2aa-28b204b52366'), 'Bertie Wooster orders Lucky Jim to order Miss Marple to write a book')
+    // ('OrderEdit', UUID('68ce78c9-046d-4279-9313-e612f9963c8c'), 'Bertie Wooster orders Lucky Jim to order Miss Marple to write a book')
     CALL { // If not in list but is related, delete relation
-        WITH xde98e8
-        MATCH (xde98e8)-[existing_rel_to_delete:CARRIED_OUT_BY]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $x6036fb
+        WITH x8a4da1
+        MATCH (x8a4da1)-[existing_rel_to_delete:CARRIED_OUT_BY]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $xd9d7d1
         DELETE existing_rel_to_delete
     }
     
-    SET xde98e8 = $xe2f6c5 // {'uid': '80913483-1fac-414d-b2aa-28b204b52366', 'label': 'Bertie Wooster orders Lucky Jim to order Miss Marple to write a book', 'real_type': 'order'}
+    SET x8a4da1 = $x2a2d25 // {'uid': '68ce78c9-046d-4279-9313-e612f9963c8c', 'label': 'Bertie Wooster orders Lucky Jim to order Miss Marple to write a book', 'real_type': 'order'}
     
 
 
 
-{'x6ec5de': '80913483-1fac-414d-b2aa-28b204b52366', 'xe2f6c5': {'uid': '80913483-1fac-414d-b2aa-28b204b52366', 'label': 'Bertie Wooster orders Lucky Jim to order Miss Marple to write a book', 'real_type': 'order'}, 'xb5c109': ['c694975a-07f4-4b3c-bcd2-1e725760d3d0'], 'xbd3bad': 'c694975a-07f4-4b3c-bcd2-1e725760d3d0', 'xddf2b8': {'uid': 'c694975a-07f4-4b3c-bcd2-1e725760d3d0', 'label': 'Lucky Jim orders Miss Marple to write a book', 'real_type': 'order'}, 'x0c785b': ['5961ea0d-6b92-46c3-abb4-84cb6aa72b8e'], 'x4ed036': '5961ea0d-6b92-46c3-abb4-84cb6aa72b8e', 'x4b6447': {'uid': '5961ea0d-6b92-46c3-abb4-84cb6aa72b8e', 'label': 'Miss Marple writes book', 'something': '', 'real_type': 'writingbook'}, 'xe06675': ['3ec1b9db-c3a4-49d1-b351-945cde25c0b2'], 'x890768': ['37b7665a-15af-41f2-8ca3-8592d292eeae'], 'x6036fb': ['b573cbaf-e093-4a9e-a56d-08b3931f74bb']}
+{'x04df6e': '68ce78c9-046d-4279-9313-e612f9963c8c', 'x2a2d25': {'uid': '68ce78c9-046d-4279-9313-e612f9963c8c', 'label': 'Bertie Wooster orders Lucky Jim to order Miss Marple to write a book', 'real_type': 'order'}, 'xd4eeeb': ['3cc4d105-f078-47d8-bdeb-2aedaf904373'], 'xf535e6': '3cc4d105-f078-47d8-bdeb-2aedaf904373', 'x020f3a': {'uid': '3cc4d105-f078-47d8-bdeb-2aedaf904373', 'label': 'Lucky Jim orders Miss Marple to write a book', 'real_type': 'order'}, 'xc3a0c5': ['37bc1fff-f573-420b-aee3-079d3e9548c2'], 'xc9498b': '37bc1fff-f573-420b-aee3-079d3e9548c2', 'x076286': {'uid': '37bc1fff-f573-420b-aee3-079d3e9548c2', 'label': 'Miss Marple writes book', 'something': '', 'real_type': 'writingbook'}, 'x74b66b': ['ff193b1a-e50b-4656-82ab-d9c0d000cca1'], 'xb3732e': ['01a89a75-495d-4cfd-a91a-8db9773e27ca'], 'xd9d7d1': ['7810bd82-3ffe-44af-8c86-0f2e4f959289']}

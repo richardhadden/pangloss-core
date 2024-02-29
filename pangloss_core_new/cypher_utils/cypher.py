@@ -706,6 +706,7 @@ def build_update_inline_query_and_params(
        MATCH ({start_node_identifier})-[existing_rel_to_delete:{relation_name.upper()}]->(currently_related_item)
         WHERE NOT currently_related_item.uid IN ${related_nodes_uid_list_param}
         DELETE existing_rel_to_delete
+        {"DETACH DELETE currently_related_item" if delete_node_on_detach else ""}
     }}"""
     return update_relations_query, update_set_query, params
 

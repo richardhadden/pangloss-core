@@ -1361,13 +1361,16 @@ async def test_update_double_embedded_objects():
 
     assert len(updated_order.thing_ordered[0].thing_ordered) == 1
 
-    print("--")
-    print(type(updated_order.thing_ordered[0].thing_ordered[0]))
-    print("--")
     assert updated_order.thing_ordered[0].thing_ordered[0].real_type
     assert type(updated_order.thing_ordered[0].thing_ordered[0]) is WritingBook
 
+    assert (
+        updated_order.thing_ordered[0].thing_ordered[0].written_by[0].uid
+        == miss_marple.uid
+    )
     # print(dict(updated_order.thing_ordered[0].thing_ordered[0]))
+
+    assert "TODO:: Here check proper cleanup of stray items" == False
 
 
 """
