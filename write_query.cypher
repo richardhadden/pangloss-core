@@ -1,7 +1,7 @@
 
         
-        CREATE (xbba45b:Person:BaseNode {uid: $x84c976, label: $x4650a4, real_type: $xdb393c})
+        CREATE (xaacfa1:Person:BaseNode {uid: $x87d62e, label: $xc3e505, real_type: $x9e333c})
         
         
-        return xbba45b{.uid, .label, .real_type}
-        {'x84c976': 'ff193b1a-e50b-4656-82ab-d9c0d000cca1', 'x4650a4': 'Miss Marple', 'xdb393c': 'person'}
+        return xaacfa1{.uid, .label, .real_type}
+        {'x87d62e': 'b166992e-0a07-4d2a-886b-97da291469a5', 'xc3e505': 'Miss Marple', 'x9e333c': 'person'}

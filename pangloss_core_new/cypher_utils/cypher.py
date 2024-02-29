@@ -704,10 +704,30 @@ def build_update_inline_query_and_params(
     CALL {{ // cleanup from {node.label}
        WITH {start_node_identifier}
        MATCH ({start_node_identifier})-[existing_rel_to_delete:{relation_name.upper()}]->(currently_related_item)
+       
         WHERE NOT currently_related_item.uid IN ${related_nodes_uid_list_param}
         DELETE existing_rel_to_delete
-        {"DETACH DELETE currently_related_item" if delete_node_on_detach else ""}
+        
+        WITH currently_related_item
+        {"""CALL {
+                       WITH currently_related_item
+            MATCH delete_path = (currently_related_item:DeleteDetach)(()-->(:DeleteDetach)){0,}(:DeleteDetach) 
+            UNWIND nodes(delete_path) as x
+           DETACH DELETE x 
+           
+        }""" if delete_node_on_detach else ""}
+           
+           
+        
+        
+        
     }}"""
+
+    if delete_node_on_detach:
+        update_relations_query += """
+           
+            
+        """
     return update_relations_query, update_set_query, params
 
 

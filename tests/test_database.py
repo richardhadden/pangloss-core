@@ -1370,10 +1370,49 @@ async def test_update_double_embedded_objects():
     )
     # print(dict(updated_order.thing_ordered[0].thing_ordered[0]))
 
-    assert (
-        "TODO:: Here check proper cleanup of stray items; delete dependent nodes that can be..."
-        == False
+    # assert (
+    #    "TODO:: Here check proper cleanup of stray items; delete dependent nodes that can be..."
+    #    == False
+    # )
+
+    order_to_edit3 = Order.Edit(
+        uid=order.uid,
+        label="Bertie Wooster orders Olive Branch to make a payment",  # Update top level prop
+        carried_out_by=[  # Update top level direct relation
+            {
+                "real_type": "person",
+                "uid": bertie_wooster.uid,
+                "label": bertie_wooster.label,
+            }
+        ],
+        thing_ordered=[
+            {
+                "label": "Olive Branch makes payment",
+                "real_type": "payment",
+                "how_much": 1,
+                "payment_made_by": [
+                    {
+                        "uid": olive_branch.uid,
+                        "label": olive_branch.label,
+                        "real_type": "person",
+                    }
+                ],
+            }
+        ],
     )
+
+    await order_to_edit3.write_edit()
+
+    updated_order = await Order.View.get(uid=order.uid)
+
+    assert len(updated_order.thing_ordered) == 1
+    assert updated_order.label == "Bertie Wooster orders Olive Branch to make a payment"
+    assert updated_order.thing_ordered[0].real_type == "payment"
+    assert updated_order.thing_ordered[0].label == "Olive Branch makes payment"
+    assert updated_order.thing_ordered[0].payment_made_by[0].uid == olive_branch.uid
+
+    with pytest.raises(PanglossNotFoundError):
+        await Order.View.get(uid=order_to_edit2.thing_ordered[0].uid)
 
 
 """
