@@ -1,6 +1,8 @@
 from collections import defaultdict
 import typing
 
+import pydantic
+
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.setup_utils import (
     __pg_create_embedded_class__,
@@ -39,6 +41,13 @@ class ModelManager:
     @classmethod
     def initialise_models(cls, depth=2):
         for subclass in cls._registered_models:
+            # Adding real_type literal to the subclass; does not work on
+            # subclassing (this way we bypass weird inheritance issues)
+            subclass.model_fields["real_type"] = pydantic.fields.FieldInfo(
+                annotation=typing.Literal[subclass.__name__.lower()],
+                default=subclass.__name__.lower(),
+            )
+
             __setup_delete_indirect_non_heritable_mixin_fields__(subclass)
             subclass.model_rebuild(force=True, _parent_namespace_depth=depth)
 

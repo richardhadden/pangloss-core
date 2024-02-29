@@ -693,6 +693,7 @@ def __setup_add_all_property_fields__(cls: type[AbstractBaseNode]) -> None:
         if (
             field_name not in cls.outgoing_relations
             and field_name not in cls.embedded_nodes
+            and field_name != "real_type"
         ):
             property_fields[field_name] = field
     cls.property_fields = property_fields
