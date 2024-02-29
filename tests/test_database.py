@@ -1370,7 +1370,10 @@ async def test_update_double_embedded_objects():
     )
     # print(dict(updated_order.thing_ordered[0].thing_ordered[0]))
 
-    assert "TODO:: Here check proper cleanup of stray items" == False
+    assert (
+        "TODO:: Here check proper cleanup of stray items; delete dependent nodes that can be..."
+        == False
+    )
 
 
 """
