@@ -18,6 +18,9 @@ class SubNodeProxy(CamelModel):
     """BaseNodes have contained types for View, Edit, Embedded; the contained types should
     be able to access some vital properties of the enclosing class"""
 
+    def __str__(self):
+        return f"{self.__class__.__name__}({super().__str__()})"
+
     base_class: typing.ClassVar[type["AbstractBaseNode"]]
 
     @classmethod

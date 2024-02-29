@@ -1336,6 +1336,94 @@ def test_recursive_model():
         )
     )
 
+    john_smith = Person(label="John Smith")
+
+    toby_jones = Person(label="Toby Jones")
+
+    olive_branch = Person(label="Olive Branch")
+
+    order = Order(
+        label="John Smith orders Toby Jones to order Olive Branch to make a payment",
+        carried_out_by=[
+            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "person"}
+        ],
+        thing_ordered=[
+            {
+                "label": "Toby Jones orders Olive Branch to make a payment",
+                "real_type": "order",
+                "carried_out_by": [
+                    {
+                        "uid": toby_jones.uid,
+                        "label": toby_jones.label,
+                        "real_type": "person",
+                    }
+                ],
+                "thing_ordered": [
+                    {
+                        "label": "Olive Branch makes payment",
+                        "real_type": "payment",
+                        "how_much": 1,
+                        "payment_made_by": [
+                            {
+                                "uid": olive_branch.uid,
+                                "label": olive_branch.label,
+                                "real_type": "person",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+
+    assert order.thing_ordered[0].thing_ordered[0]
+    assert order.thing_ordered[0].thing_ordered[0].label == "Olive Branch makes payment"
+    assert type(order.thing_ordered[0].thing_ordered[0]) is Payment
+
+    order_edit = Order.Edit(
+        uid=order.uid,
+        label="John Smith orders Toby Jones to order Olive Branch to make a payment",
+        carried_out_by=[
+            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "person"}
+        ],
+        thing_ordered=[
+            {
+                "uid": order.thing_ordered[0].uid,
+                "label": "Toby Jones orders Olive Branch to make a payment",
+                "real_type": "order",
+                "carried_out_by": [
+                    {
+                        "uid": toby_jones.uid,
+                        "label": toby_jones.label,
+                        "real_type": "person",
+                    }
+                ],
+                "thing_ordered": [
+                    {
+                        "uid": order.thing_ordered[0].thing_ordered[0].uid,
+                        "label": "Olive Branch makes payment",
+                        "real_type": "payment",
+                        "how_much": 1,
+                        "payment_made_by": [
+                            {
+                                "uid": olive_branch.uid,
+                                "label": olive_branch.label,
+                                "real_type": "person",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+
+    assert order_edit.thing_ordered[0].thing_ordered[0]
+    assert (
+        order_edit.thing_ordered[0].thing_ordered[0].label
+        == "Olive Branch makes payment"
+    )
+    assert type(order_edit.thing_ordered[0].thing_ordered[0]) is Payment.Edit
+
 
 def test_find_cyclic_references():
     class Person(BaseNode):
@@ -1374,9 +1462,6 @@ def test_find_cyclic_references():
     ModelManager.initialise_models(depth=3)
 
     assert __setup_find_cyclic_outgoing_references_for_edit__(Order) == set([Order])
-    """ assert __setup_find_cyclic_outgoing_references_for_edit__(Intermediate) == set(
-        [Order]
-    ) """
 
 
 def test_circular_recursive_model():

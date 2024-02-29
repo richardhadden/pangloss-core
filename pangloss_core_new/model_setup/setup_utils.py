@@ -723,6 +723,7 @@ def __setup_construct_view_type__(cls: type[AbstractBaseNode]):
             True,
         ),
         **incoming_model_fields,
+        real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
         base_class=(typing.ClassVar[type[AbstractBaseNode]], cls),
     )
 
@@ -797,7 +798,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
                     relation.relation_config.validators,
                     relation.relation_config,
                 ],
-                pydantic.Field(default_factory=list),
+                pydantic.Field(default_factory=list, discriminator="real_type"),
             )
 
         else:
@@ -813,7 +814,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
                     relation.relation_config.validators,
                     relation.relation_config,
                 ],
-                pydantic.Field(default_factory=list),
+                pydantic.Field(default_factory=list, discriminator="real_type"),
             )
 
     edit_model = pydantic.create_model(
@@ -823,6 +824,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
             typing.ClassVar[bool],
             True,
         ),
+        real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
         base_class=(typing.ClassVar[AbstractBaseNode], cls),
         **outgoing_relation_new_defs,
     )

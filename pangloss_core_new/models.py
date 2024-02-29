@@ -21,6 +21,9 @@ class BaseNode(AbstractBaseNode):
         ModelManager.register_model(cls)
         super().__init_subclass__()
 
+    def __str__(self):
+        return f"{self.__class__.__name__}({super().__str__()})"
+
     @classmethod
     @read_transaction
     async def get_view(cls, tx: Transaction, uid: uuid.UUID) -> ViewNodeBase | None:

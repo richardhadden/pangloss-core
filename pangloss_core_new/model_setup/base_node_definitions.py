@@ -2,6 +2,8 @@ import inspect
 import typing
 import uuid
 
+import pydantic
+
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.config_definitions import (
     _EmbeddedNodeDefinition,
@@ -26,6 +28,8 @@ class ViewNodeBase(SubNodeProxy):
 
 
 class EditNodeBase(SubNodeProxy):
+    uid: uuid.UUID
+
     @classmethod
     def get(cls, uid: uuid.UUID) -> typing.Awaitable[typing.Self | None]:
         return cls.base_class.get_edit(uid)  # type: ignore

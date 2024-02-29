@@ -331,7 +331,7 @@ def create_set_statement_for_properties(
     return set_query, set_params
 
 
-def build_update_related_inline_editable_query(
+def Xbuild_update_related_inline_editable_query(
     node: EditNodeBase,
     relation_name,
     start_node_identifier,
@@ -461,38 +461,34 @@ def build_update_related_inline_editable_query(
     return query, params
 
 
-def build_update_related_query(node, relation_name, start_node_identifier):
-    # print("SHOULD NOT BE CALLED")
+def Xbuild_update_related_query(node, relation_name, start_node_identifier):
     related_item_array_identifier = get_unique_string()
 
     params = {
         related_item_array_identifier: [
-            {"uid": str(item.uid), "label": item.label, "real_type": item.real_type}
-            for item in getattr(node, relation_name, [])
+            str(item.uid) for item in getattr(node, relation_name, [])
         ]
     }
 
     query = f"""
     CALL {{ // Attach existing node if it is not attached
         WITH {start_node_identifier}
-        UNWIND ${related_item_array_identifier} AS updated_related_item
-            MATCH (node_to_relate {{uid: updated_related_item.uid}})
+        UNWIND ${related_item_array_identifier} AS updated_related_item_uid
+            MATCH (node_to_relate {{uid: updated_related_item_uid}})
             WHERE NOT ({start_node_identifier})-[:{relation_name.upper()}]->(node_to_relate)
             CREATE ({start_node_identifier})-[:{relation_name.upper()}]->(node_to_relate)
     }}
     CALL {{ // If not in list but is related, delete relation
         WITH {start_node_identifier}
-        WITH {start_node_identifier}, [x IN ${related_item_array_identifier} | x.uid] AS updated_related_items_uids
         MATCH ({start_node_identifier})-[existing_rel_to_delete:{relation_name.upper()}]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN updated_related_items_uids
+        WHERE NOT currently_related_item.uid IN ${related_item_array_identifier}
         DELETE existing_rel_to_delete
     }}
-    
     """
     return query, params
 
 
-def build_update_node_query_and_params(
+def Xbuild_update_node_query_and_params(
     node, node_identifier
 ) -> tuple[str, dict[str, Any]]:
     # print("=======")
@@ -543,12 +539,14 @@ def build_update_node_query_and_params(
     // Set properties
     {set_properties_statements}
     
+   
+    
     """
 
     return query, params
 
 
-def update_query(node: AbstractBaseNode) -> tuple[str, dict[str, Any]]:
+def Xupdate_query(node: AbstractBaseNode) -> tuple[str, dict[str, Any]]:
     node_identifier = get_unique_string()
     node_uid_param = get_unique_string()
 
@@ -567,4 +565,205 @@ def update_query(node: AbstractBaseNode) -> tuple[str, dict[str, Any]]:
         f.write(query)
 
     # (params)
+    return query, params
+
+
+"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+
+
+def build_properties_update_dict(node: EditNodeBase):
+    property_fields = node.property_fields
+    properties = {
+        prop_name: convert_type_for_writing(prop_value)
+        for prop_name, prop_value in dict(node).items()
+        if prop_name in property_fields
+    }
+    properties["real_type"] = node.base_class.__name__.lower()
+    return properties
+
+
+def build_update_related_query(node, relation_name, start_node_identifier):
+    related_item_array_identifier = get_unique_string()
+    params = {
+        related_item_array_identifier: [
+            str(item.uid) for item in getattr(node, relation_name, [])
+        ]
+    }
+    query = f"""
+    // {node.__class__.__name__, node.uid, node.label}
+    CALL {{ // Attach existing node if it is not attached
+        WITH {start_node_identifier}
+        UNWIND ${related_item_array_identifier} AS updated_related_item_uid
+            MATCH (node_to_relate {{uid: updated_related_item_uid}})
+            WHERE NOT ({start_node_identifier})-[:{relation_name.upper()}]->(node_to_relate)
+            CREATE ({start_node_identifier})-[:{relation_name.upper()}]->(node_to_relate)
+    }}
+    // {node.__class__.__name__, node.uid, node.label}
+    CALL {{ // If not in list but is related, delete relation
+        WITH {start_node_identifier}
+        MATCH ({start_node_identifier})-[existing_rel_to_delete:{relation_name.upper()}]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN ${related_item_array_identifier}
+        DELETE existing_rel_to_delete
+    }}
+    """
+    return query, params
+
+
+def build_update_inline_query_and_params(
+    node: EditNodeBase,
+    relation_name,
+    start_node_identifier,
+    delete_node_on_detach=False,
+    accumulated_withs=None,
+):
+    if not accumulated_withs:
+        accumulated_withs = set([start_node_identifier])
+
+    update_relations_query = ""
+
+    update_set_query = ""
+    params = {}
+
+    # Now, iterate through all the nodes and recursively build query to update
+    related_nodes = getattr(node, relation_name, [])
+    related_node_uid_list = [str(node.uid) for node in related_nodes]
+    related_nodes_uid_list_param = get_unique_string()
+    params.update({related_nodes_uid_list_param: related_node_uid_list})
+
+    for related_node in related_nodes:
+        related_node_identifier = get_unique_string()
+        related_node_uid_param = get_unique_string()
+
+        params.update({related_node_uid_param: str(related_node.uid)})
+
+        (
+            target_update_relations_query,
+            target_update_set_query,
+            target_params,
+        ) = build_node_update_query_and_params(
+            related_node,
+            related_node_identifier,
+            accumulated_withs=set([*accumulated_withs, related_node_identifier]),
+        )
+        accumulated_withs.add(related_node_identifier)
+
+        extra_labels = ["CreateInline", "ReadInline", "EditInline"]
+        if node.outgoing_relations[
+            relation_name
+        ].relation_config.delete_related_on_detach:
+            extra_labels.append("DeleteDetach")
+        query_labels = labels_to_query_labels(related_node, extra_labels=extra_labels)
+        print(query_labels)
+        # update_relations_query +=
+        update_relations_query += f"""\n
+        
+        
+        
+        MERGE ({related_node_identifier}{query_labels} {{uid: ${related_node_uid_param}}}) // {related_node.base_class.__name__}, {related_node.uid}, {related_node.label}
+        ON CREATE
+       
+            {target_update_set_query}
+            
+        ON MATCH
+            {target_update_set_query}
+        
+        WITH {", ".join(accumulated_withs)} // <<
+          {target_update_relations_query}
+        
+        
+        
+        MERGE ({start_node_identifier})-[:{relation_name.upper()}]->({related_node_identifier})
+        
+
+      WITH {", ".join(accumulated_withs)} // <<<<
+        """
+
+        # update_relations_query += target_update_relations_query
+
+        # update_set_query += target_update_set_query
+        params.update(target_params)
+    update_relations_query += f"""
+    WITH {", ".join(accumulated_withs)} // <<<<
+        
+    CALL {{ // cleanup from {node.label}
+       WITH {start_node_identifier}
+       MATCH ({start_node_identifier})-[existing_rel_to_delete:{relation_name.upper()}]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN ${related_nodes_uid_list_param}
+        DELETE existing_rel_to_delete
+    }}"""
+    return update_relations_query, update_set_query, params
+
+
+def build_node_update_query_and_params(
+    node: EditNodeBase, node_identifier: str, accumulated_withs=None
+) -> tuple[str, str, dict[str, Any]]:
+    if not accumulated_withs:
+        accumulated_withs = set([node_identifier])
+    print("Building for", node.base_class.__name__)
+    properties_dict = build_properties_update_dict(node)
+    properties_dict_param = get_unique_string()
+    params: dict[str, Any] = {properties_dict_param: properties_dict}
+    update_set_query = f"""
+    SET {node_identifier} = ${properties_dict_param} // {properties_dict}
+    """
+    update_relations_query = ""
+    for relation_name, relation in node.base_class.outgoing_relations.items():
+        if not relation.relation_config.edit_inline:
+            update_related_query, update_related_params = build_update_related_query(
+                node, relation_name, node_identifier
+            )
+            update_relations_query += update_related_query
+            params.update(update_related_params)
+        if relation.relation_config.edit_inline:
+            (
+                relation_update_related_query,
+                relation_update_set_query,
+                relation_params,
+            ) = build_update_inline_query_and_params(
+                node,
+                relation_name,
+                node_identifier,
+                relation.relation_config.delete_related_on_detach,
+                accumulated_withs=accumulated_withs,
+            )
+            update_relations_query += relation_update_related_query
+            update_set_query += relation_update_set_query
+            params.update(relation_params)
+
+    return update_relations_query, update_set_query, params
+
+
+def update_query(node: EditNodeBase) -> tuple[str, dict[str, Any]]:
+    node_identifier = get_unique_string()
+    node_uid_param = get_unique_string()
+
+    params = {node_uid_param: str(node.uid)}
+    query = f"""MATCH ({node_identifier} {{uid: ${node_uid_param}}}) // {node.base_class.__name__}, {node.uid}, {node.label}"""
+
+    (
+        update_relations_query,
+        update_set_query,
+        node_update_params,
+    ) = build_node_update_query_and_params(node, node_identifier)
+    query += update_relations_query
+
+    query += update_set_query
+
+    params.update(node_update_params)
     return query, params

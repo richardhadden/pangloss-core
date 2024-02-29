@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Optional
 
 import pytest
 import pytest_asyncio
@@ -1144,7 +1144,7 @@ async def test_update_inline_editable_relation(clear_database):
 @pytest.mark.asyncio
 async def test_update_double_embedded_objects():
     await Database.dangerously_clear_database()
-    from typing import Self, Union
+    from typing import Union
 
     class Person(BaseNode):
         pass
@@ -1155,9 +1155,20 @@ async def test_update_double_embedded_objects():
             RelationTo[Person], RelationConfig(reverse_name="made_payment")
         ]
 
+    class WritingBook(BaseNode):
+        written_by: Annotated[
+            RelationTo[Person], RelationConfig(reverse_name="made_payment")
+        ]
+        something: Optional[str] = ""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+            print(args, kwargs)
+
     class Order(BaseNode):
         thing_ordered: Annotated[
-            RelationTo[Union[Order, Payment]],
+            RelationTo[Union[Order, Payment, WritingBook]],
             RelationConfig(
                 reverse_name="was_ordered_in",
                 create_inline=True,
@@ -1216,20 +1227,34 @@ async def test_update_double_embedded_objects():
 
     await order.create()
 
+    bertie_wooster = Person(label="Bertie Wooster")
+    await bertie_wooster.create()
+
+    lucky_jim = Person(label="Lucky Jim")
+    await lucky_jim.create()
+
+    miss_marple = Person(label="Miss Marple")
+    await miss_marple.create()
+
     order_to_edit = Order.Edit(
         uid=order.uid,
-        label="John Smith orders Toby Jones to order Olive Branch to make a payment",
-        carried_out_by=[
-            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "person"}
+        label="Bertie Wooster orders Toby Jones to order Olive Branch to make a payment",  # Update top level prop
+        carried_out_by=[  # Update top level direct relation
+            {
+                "real_type": "person",
+                "uid": bertie_wooster.uid,
+                "label": bertie_wooster.label,
+            }
         ],
         thing_ordered=[
             {
+                "real_type": "order",
                 "uid": order.thing_ordered[0].uid,
-                "label": "Toby Jones orders Olive Branch to make a payment",
+                "label": "Lucky Jim orders Olive Branch to make a payment UPDATED",  # Update second level prop
                 "carried_out_by": [
                     {
-                        "uid": toby_jones.uid,
-                        "label": toby_jones.label,
+                        "uid": lucky_jim.uid,
+                        "label": lucky_jim.label,
                         "real_type": "person",
                     }
                 ],
@@ -1252,7 +1277,97 @@ async def test_update_double_embedded_objects():
         ],
     )
 
+    assert type(order_to_edit.thing_ordered[0].thing_ordered[0]) is Payment.Edit
+    assert order_to_edit.thing_ordered[0].thing_ordered[0].real_type == "payment"
+
     await order_to_edit.write_edit()
+
+    updated_order = await Order.View.get(uid=order.uid)
+
+    assert updated_order.carried_out_by[0].uid == bertie_wooster.uid
+    assert (
+        updated_order.label
+        == "Bertie Wooster orders Toby Jones to order Olive Branch to make a payment"
+    )
+
+    assert len(updated_order.thing_ordered) == 1
+
+    assert updated_order.thing_ordered[0].thing_ordered[0].real_type == "payment"
+
+    """
+    assert (
+        updated_order.thing_ordered[0].label
+        == "Lucky Jim orders Olive Branch to make a payment UPDATED"
+    )
+
+    assert updated_order.thing_ordered[0].carried_out_by[0].uid == lucky_jim.uid
+
+    assert updated_order.thing_ordered[0].thing_ordered[0]
+    """
+    order_to_edit2 = Order.Edit(
+        uid=order.uid,
+        label="Bertie Wooster orders Lucky Jim to order Miss Marple to write a book",  # Update top level prop
+        carried_out_by=[  # Update top level direct relation
+            {
+                "real_type": "person",
+                "uid": bertie_wooster.uid,
+                "label": bertie_wooster.label,
+            }
+        ],
+        thing_ordered=[
+            {
+                "real_type": "order",
+                "uid": order.thing_ordered[0].uid,
+                "label": "Lucky Jim orders Miss Marple to write a book",  # Update second level prop
+                "carried_out_by": [
+                    {
+                        "uid": lucky_jim.uid,
+                        "label": lucky_jim.label,
+                        "real_type": "person",
+                    }
+                ],
+                "thing_ordered": [
+                    {
+                        "label": "Miss Marple writes book",
+                        "real_type": "writingbook",
+                        "written_by": [
+                            {
+                                "uid": miss_marple.uid,
+                                "label": miss_marple.label,
+                                "real_type": "person",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+
+    await order_to_edit2.write_edit()
+
+    updated_order = await Order.View.get(uid=order.uid)
+
+    assert (
+        updated_order.label
+        == "Bertie Wooster orders Lucky Jim to order Miss Marple to write a book"
+    )
+    assert len(updated_order.thing_ordered) == 1
+
+    assert (
+        updated_order.thing_ordered[0].label
+        == "Lucky Jim orders Miss Marple to write a book"
+    )
+    assert updated_order.thing_ordered[0].carried_out_by[0].uid == lucky_jim.uid
+
+    assert len(updated_order.thing_ordered[0].thing_ordered) == 1
+
+    print("--")
+    print(type(updated_order.thing_ordered[0].thing_ordered[0]))
+    print("--")
+    assert updated_order.thing_ordered[0].thing_ordered[0].real_type
+    assert type(updated_order.thing_ordered[0].thing_ordered[0]) is WritingBook
+
+    # print(dict(updated_order.thing_ordered[0].thing_ordered[0]))
 
 
 """
