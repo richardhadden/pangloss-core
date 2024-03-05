@@ -1142,7 +1142,7 @@ async def test_update_inline_editable_relation(clear_database):
 
 
 @pytest.mark.asyncio
-async def test_update_double_embedded_objects():
+async def test_update_double_embedded_objects(clear_database):
     await Database.dangerously_clear_database()
     from typing import Union
 
@@ -1224,8 +1224,11 @@ async def test_update_double_embedded_objects():
             }
         ],
     )
+    import time
 
+    start = time.perf_counter()
     await order.create()
+    print("Created in :", time.perf_counter() - start)
 
     bertie_wooster = Person(label="Bertie Wooster")
     await bertie_wooster.create()
@@ -1280,7 +1283,9 @@ async def test_update_double_embedded_objects():
     assert type(order_to_edit.thing_ordered[0].thing_ordered[0]) is Payment.Edit
     assert order_to_edit.thing_ordered[0].thing_ordered[0].real_type == "payment"
 
+    start = time.perf_counter()
     await order_to_edit.write_edit()
+    print("First edit in :", time.perf_counter() - start)
 
     updated_order = await Order.View.get(uid=order.uid)
 
@@ -1294,7 +1299,6 @@ async def test_update_double_embedded_objects():
 
     assert updated_order.thing_ordered[0].thing_ordered[0].real_type == "payment"
 
-    """
     assert (
         updated_order.thing_ordered[0].label
         == "Lucky Jim orders Olive Branch to make a payment UPDATED"
@@ -1302,8 +1306,6 @@ async def test_update_double_embedded_objects():
 
     assert updated_order.thing_ordered[0].carried_out_by[0].uid == lucky_jim.uid
 
-    assert updated_order.thing_ordered[0].thing_ordered[0]
-    """
     order_to_edit2 = Order.Edit(
         uid=order.uid,
         label="Bertie Wooster orders Lucky Jim to order Miss Marple to write a book",  # Update top level prop
@@ -1343,7 +1345,9 @@ async def test_update_double_embedded_objects():
         ],
     )
 
+    start = time.perf_counter()
     await order_to_edit2.write_edit()
+    print("Second edit in:", time.perf_counter() - start)
 
     updated_order = await Order.View.get(uid=order.uid)
 
@@ -1400,19 +1404,215 @@ async def test_update_double_embedded_objects():
             }
         ],
     )
-
+    start = time.perf_counter()
     await order_to_edit3.write_edit()
+    print("Third edit in :", time.perf_counter() - start)
 
+    start = time.perf_counter()
     updated_order = await Order.View.get(uid=order.uid)
+    print("Getting view in :", time.perf_counter() - start)
 
     assert len(updated_order.thing_ordered) == 1
     assert updated_order.label == "Bertie Wooster orders Olive Branch to make a payment"
     assert updated_order.thing_ordered[0].real_type == "payment"
+    assert updated_order.thing_ordered[0].uid == order_to_edit3.thing_ordered[0].uid
     assert updated_order.thing_ordered[0].label == "Olive Branch makes payment"
     assert updated_order.thing_ordered[0].payment_made_by[0].uid == olive_branch.uid
 
+    ordered_olive_branch = await Payment.View.get(
+        uid=updated_order.thing_ordered[0].uid
+    )
+    assert ordered_olive_branch.label == "Olive Branch makes payment"
+
     with pytest.raises(PanglossNotFoundError):
         await Order.View.get(uid=order_to_edit2.thing_ordered[0].uid)
+
+
+@pytest.mark.asyncio
+async def test_update_nested_embedded():
+    class Pet(BaseNode):
+        name: str
+
+    class Inner(BaseNode):
+        name: str
+        inner_has_pet: Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class OuterTypeOne(BaseNode):
+        inner: Embedded[Inner]
+        some_value: str
+        outer_one_has_pet: Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class OuterTypeTwo(BaseNode):
+        inner: Embedded[Inner]
+        some_other_value: str
+        outer_two_has_pet: Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class Person(BaseNode):
+        outer: Embedded[OuterTypeOne | OuterTypeTwo]
+        person_has_pet: Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    john_smith_pet = Pet(label="John Smith's Pet", name="Truffles")
+    await john_smith_pet.create()
+
+    outer_one_pet = Pet(label="Outer One Pet", name="Wuffles")
+    await outer_one_pet.create()
+
+    outer_two_pet = Pet(label="Outer Two Pet", name="Fluffles")
+    await outer_two_pet.create()
+
+    inner_pet = Pet(label="Inner Pet", name="Snuffles")
+    await inner_pet.create()
+
+    john_smith = Person(
+        label="John Smith",
+        person_has_pet=[john_smith_pet.as_reference_dict()],
+        outer=[
+            {
+                "real_type": "outertypeone",
+                "some_value": "SomeValue",
+                "outer_one_has_pet": [outer_one_pet.as_reference_dict()],
+                "inner": [
+                    {
+                        "real_type": "inner",
+                        "name": "InnerEmbedded",
+                        "inner_has_pet": [inner_pet.as_reference_dict()],
+                    }
+                ],
+            }
+        ],
+    )
+
+    await john_smith.create()
+
+    john_smith_edit = Person.Edit(
+        uid=john_smith.uid,
+        label="John Smith",
+        person_has_pet=[john_smith_pet.as_reference_dict()],
+        outer=[
+            {
+                "real_type": "outertypetwo",
+                "some_other_value": "SomeValue",
+                "outer_two_has_pet": [outer_two_pet.as_reference_dict()],
+                "inner": [
+                    {
+                        "real_type": "inner",
+                        "name": "InnerEmbedded",
+                        "inner_has_pet": [inner_pet.as_reference_dict()],
+                    }
+                ],
+            }
+        ],
+    )
+
+    await john_smith_edit.write_edit()
+
+    john_smith_updated = await Person.View.get(uid=john_smith.uid)
+    assert john_smith_updated
+    assert len(john_smith_updated.outer) == 1
+
+    assert john_smith_updated.outer[0].real_type == "outertypetwo"
+
+
+@pytest.mark.asyncio
+async def test_update_raises_error_and_does_nothing_if_uid_not_found():
+    class Pet(BaseNode):
+        name: str
+
+    class Inner(BaseNode):
+        name: str
+        inner_has_pet: Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class OuterTypeOne(BaseNode):
+        inner: Embedded[Inner]
+        some_value: str
+        outer_one_has_pet: Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class OuterTypeTwo(BaseNode):
+        inner: Embedded[Inner]
+        some_other_value: str
+        outer_two_has_pet: Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class Person(BaseNode):
+        outer: Embedded[OuterTypeOne | OuterTypeTwo]
+        person_has_pet: Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    john_smith_pet = Pet(label="John Smith's Pet", name="Truffles")
+    await john_smith_pet.create()
+
+    outer_one_pet = Pet(label="Outer One Pet", name="Wuffles")
+    await outer_one_pet.create()
+
+    outer_two_pet = Pet(label="Outer Two Pet", name="Fluffles")
+    await outer_two_pet.create()
+
+    inner_pet = Pet(label="Inner Pet", name="Snuffles")
+    await inner_pet.create()
+
+    john_smith = Person(
+        label="John Smith",
+        person_has_pet=[john_smith_pet.as_reference_dict()],
+        outer=[
+            {
+                "real_type": "outertypeone",
+                "some_value": "SomeValue",
+                "outer_one_has_pet": [outer_one_pet.as_reference_dict()],
+                "inner": [
+                    {
+                        "real_type": "inner",
+                        "name": "InnerEmbedded",
+                        "inner_has_pet": [inner_pet.as_reference_dict()],
+                    }
+                ],
+            }
+        ],
+    )
+
+    await john_smith.create()
+
+    john_smith_edit = Person.Edit(
+        label="John Smith",
+        person_has_pet=[john_smith_pet.as_reference_dict()],
+        outer=[
+            {
+                "real_type": "outertypetwo",
+                "some_other_value": "SomeValue",
+                "outer_two_has_pet": [outer_two_pet.as_reference_dict()],
+                "inner": [
+                    {
+                        "real_type": "inner",
+                        "name": "InnerEmbedded",
+                        "inner_has_pet": [inner_pet.as_reference_dict()],
+                    }
+                ],
+            }
+        ],
+    )
+    with pytest.raises(PanglossNotFoundError):
+        await john_smith_edit.write_edit()
+
+    john_smith_unchanged_edit = await Person.Edit.get(uid=john_smith.uid)
+    assert john_smith_unchanged_edit
+    assert dict(john_smith_unchanged_edit) == dict(john_smith)
 
 
 """

@@ -153,7 +153,7 @@ def build_write_query_and_params_dict(
                 embedded_query_create_clauses,
                 embedded_params_dict,
             ) = build_write_query_and_params_dict(
-                embedded_node, extra_labels=["Embedded"]
+                embedded_node, extra_labels=["Embedded", "DeleteDetach"]
             )
             CREATE_CLAUSES += [
                 *embedded_query_create_clauses,
@@ -606,7 +606,7 @@ def build_update_related_query(node, relation_name, start_node_identifier):
         ]
     }
     query = f"""
-    // {node.__class__.__name__, node.uid, node.label}
+    // {node.__class__.__name__, node.uid}
     CALL {{ // Attach existing node if it is not attached
         WITH {start_node_identifier}
         UNWIND ${related_item_array_identifier} AS updated_related_item_uid
@@ -614,7 +614,7 @@ def build_update_related_query(node, relation_name, start_node_identifier):
             WHERE NOT ({start_node_identifier})-[:{relation_name.upper()}]->(node_to_relate)
             CREATE ({start_node_identifier})-[:{relation_name.upper()}]->(node_to_relate)
     }}
-    // {node.__class__.__name__, node.uid, node.label}
+    // {node.__class__.__name__, node.uid}
     CALL {{ // If not in list but is related, delete relation
         WITH {start_node_identifier}
         MATCH ({start_node_identifier})-[existing_rel_to_delete:{relation_name.upper()}]->(currently_related_item)
@@ -649,8 +649,14 @@ def build_update_inline_query_and_params(
     for related_node in related_nodes:
         related_node_identifier = get_unique_string()
         related_node_uid_param = get_unique_string()
+        related_node_real_type_param = get_unique_string()
 
-        params.update({related_node_uid_param: str(related_node.uid)})
+        params.update(
+            {
+                related_node_uid_param: str(related_node.uid),
+                related_node_real_type_param: related_node.real_type,
+            }
+        )
 
         (
             target_update_relations_query,
@@ -669,13 +675,13 @@ def build_update_inline_query_and_params(
         ].relation_config.delete_related_on_detach:
             extra_labels.append("DeleteDetach")
         query_labels = labels_to_query_labels(related_node, extra_labels=extra_labels)
-        print(query_labels)
+
         # update_relations_query +=
         update_relations_query += f"""\n
         
         
         
-        MERGE ({related_node_identifier}{query_labels} {{uid: ${related_node_uid_param}}}) // {related_node.base_class.__name__}, {related_node.uid}, {related_node.label}
+        MERGE ({related_node_identifier}{query_labels} {{uid: ${related_node_uid_param}, real_type: ${related_node_real_type_param}}}) // {related_node.base_class.__name__}, {related_node.uid}, {related_node.label}
         ON CREATE
        
             {target_update_set_query}
@@ -716,18 +722,109 @@ def build_update_inline_query_and_params(
            DETACH DELETE x 
            
         }""" if delete_node_on_detach else ""}
-           
-           
+
+    }}"""
+
+    return update_relations_query, update_set_query, params
+
+
+def build_update_embedded_query_and_params(
+    node: EmbeddedNodeBase | EditNodeBase,
+    embedded_relation_name,
+    start_node_identifier,
+    accumulated_withs=None,
+):
+    print("Building embedded update query for", node.__class__.__name__)
+    if not accumulated_withs:
+        accumulated_withs = set([start_node_identifier])
+
+    update_relations_query = ""
+
+    update_set_query = ""
+    params = {}
+
+    # Now, iterate through all the nodes and recursively build query to update
+    embedded_nodes = getattr(node, embedded_relation_name, [])
+    embedded_node_uid_list = [str(node.uid) for node in embedded_nodes]
+    embedded_nodes_uid_list_param = get_unique_string()
+    params.update({embedded_nodes_uid_list_param: embedded_node_uid_list})
+
+    for embedded_node in embedded_nodes:
+        embedded_node_identifier = get_unique_string()
+        embedded_node_uid_param = get_unique_string()
+        embedded_node_real_type_param = get_unique_string()
+        print("Adding embedded for", embedded_node.__class__.__name__)
+        params.update(
+            {
+                embedded_node_uid_param: str(embedded_node.uid),
+                embedded_node_real_type_param: embedded_node.real_type,
+            }
+        )
+
+        (
+            target_update_relations_query,
+            target_update_set_query,
+            target_params,
+        ) = build_node_update_query_and_params(
+            embedded_node,
+            embedded_node_identifier,
+            accumulated_withs=set([*accumulated_withs, embedded_node_identifier]),
+        )
+        accumulated_withs.add(embedded_node_identifier)
+
+        extra_labels = ["Embedded", "DeleteDetach"]
+
+        query_labels = labels_to_query_labels(embedded_node, extra_labels=extra_labels)
+
+        # update_relations_query +=
+        update_relations_query += f"""\n
         
         
+        
+        MERGE ({embedded_node_identifier}{query_labels} {{uid: ${embedded_node_uid_param}, real_type: ${embedded_node_real_type_param}}}) // {embedded_node.base_class.__name__}, {embedded_node.uid}
+        ON CREATE
+       
+            {target_update_set_query}
+            
+        ON MATCH
+            {target_update_set_query}
+        
+        WITH {", ".join(accumulated_withs)} // <<
+          {target_update_relations_query}
+        
+        
+        
+        MERGE ({start_node_identifier})-[:{embedded_relation_name.upper()}]->({embedded_node_identifier})
+        
+
+      WITH {", ".join(accumulated_withs)} // <<<<
+        """
+
+        # update_relations_query += target_update_relations_query
+
+        # update_set_query += target_update_set_query
+        params.update(target_params)
+    update_relations_query += f"""
+    WITH {", ".join(accumulated_withs)} // <<<<
+        
+    CALL  {{
+       WITH {start_node_identifier}
+       MATCH ({start_node_identifier})-[existing_rel_to_delete:{embedded_relation_name.upper()}]->(currently_related_item)
+       
+        WHERE NOT currently_related_item.uid IN ${embedded_nodes_uid_list_param}
+        DELETE existing_rel_to_delete
+        
+        WITH currently_related_item
+        CALL {{
+                       WITH currently_related_item
+            MATCH delete_path = (currently_related_item:DeleteDetach)(()-->(:DeleteDetach)){{0,}}(:DeleteDetach) 
+            UNWIND nodes(delete_path) as x
+           DETACH DELETE x 
+           
+        }}
         
     }}"""
 
-    if delete_node_on_detach:
-        update_relations_query += """
-           
-            
-        """
     return update_relations_query, update_set_query, params
 
 
@@ -736,7 +833,7 @@ def build_node_update_query_and_params(
 ) -> tuple[str, str, dict[str, Any]]:
     if not accumulated_withs:
         accumulated_withs = set([node_identifier])
-    print("Building for", node.base_class.__name__)
+
     properties_dict = build_properties_update_dict(node)
     properties_dict_param = get_unique_string()
     params: dict[str, Any] = {properties_dict_param: properties_dict}
@@ -744,6 +841,18 @@ def build_node_update_query_and_params(
     SET {node_identifier} = ${properties_dict_param} // {properties_dict}
     """
     update_relations_query = ""
+    for embedded_name, embedded_definition in node.base_class.embedded_nodes.items():
+        (
+            embedded_update_related_query,
+            embedded_update_set_query,
+            embedded_params,
+        ) = build_update_embedded_query_and_params(
+            node, embedded_name, node_identifier, accumulated_withs=accumulated_withs
+        )
+        update_relations_query += embedded_update_related_query
+        update_set_query += embedded_update_set_query
+        params.update(embedded_params)
+
     for relation_name, relation in node.base_class.outgoing_relations.items():
         if not relation.relation_config.edit_inline:
             update_related_query, update_related_params = build_update_related_query(
@@ -785,6 +894,8 @@ def update_query(node: EditNodeBase) -> tuple[str, dict[str, Any]]:
     query += update_relations_query
 
     query += update_set_query
+
+    query += f"""RETURN {node_identifier}{{.uid}}"""
 
     params.update(node_update_params)
     return query, params

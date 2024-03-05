@@ -104,10 +104,15 @@ class BaseNode(AbstractBaseNode):
 
     @staticmethod
     @write_transaction
-    async def _write_edit(item, tx: Transaction) -> None:
+    async def _write_edit(item: EditNodeBase, tx: Transaction) -> None:
         query, params = cypher.update_query(item)
         with open("update_query.cypher", "w") as f:
             f.write(query)
             f.write("\n\n\n\n")
             f.write(str(params))
-        await tx.run(query, params)  # type: ignore
+        result = await tx.run(query, params)  # type: ignore
+        record = await result.value()
+        if len(record) == 0:
+            raise PanglossNotFoundError(
+                f'<{item.base_class.__name__} uid="{item.uid}"> not found'
+            )

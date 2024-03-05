@@ -1,3 +1,4 @@
+import datetime
 import inspect
 import typing
 import uuid
@@ -15,6 +16,13 @@ from pangloss_core_new.model_setup.config_definitions import (
 from pangloss_core_new.model_setup.models_base import BaseNodeStandardFields
 from pangloss_core_new.model_setup.subnode_proxy import SubNodeProxy
 from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
+
+
+class ReferenceDict(typing.TypedDict):
+    uid: uuid.UUID
+    label: str
+    real_type: str
+    relation_properties: typing.NotRequired[dict[str, typing.Any]]
 
 
 class EmbeddedNodeBase(SubNodeProxy):
@@ -83,6 +91,15 @@ class AbstractBaseNode(BaseNodeStandardFields):
     ]
 
     property_fields: typing.ClassVar[dict[str, type]]
+
+    real_type: str
+    """
+    created_when: datetime.datetime = pydantic.Field(
+        default_factory=datetime.datetime.now
+    )
+    modified_when: datetime.datetime = pydantic.Field(
+        default_factory=datetime.datetime.now
+    )"""
 
     def __init_subclass__(cls):
         cls.__setup_run_init_subclass_checks__()
@@ -166,3 +183,23 @@ class AbstractBaseNode(BaseNodeStandardFields):
                 f"Base models cannot use 'Embedded' as part of the name, as this is used "
                 f"internally. (Model '{cls.__name__}' should be renamed)"
             )
+
+    def as_reference_dict(
+        self, relation_properties: dict[str, typing.Any] | None = None
+    ) -> ReferenceDict:
+        """Gets the Reference object of a BaseNode as a dict, i.e.:
+        ```
+        person = Person(label="John Smith", name="John Smith", age=100)
+
+        person.as_reference_dict() == {"uid": person.uid, "label": "John Smith", "real_type": "person"}
+        ```
+        Takes optional `relation_properties` argument, which is included in dict as `"relation_properties"`
+        """
+        reference_dict: ReferenceDict = {
+            "uid": self.uid,
+            "label": self.label,
+            "real_type": self.real_type,  # type: ignore
+        }
+        if relation_properties:
+            reference_dict["relation_properties"] = relation_properties
+        return reference_dict

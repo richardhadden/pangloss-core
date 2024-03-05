@@ -1,0 +1,24 @@
+MATCH (n { uid: "56b5d738-e207-4125-bbed-591244ac7bb1" })
+
+ SET n = { uid: "56b5d738-e207-4125-bbed-591244ac7bb1", label: "John Smith orders Toby Jones to order Olive Branch to make a payment" }
+
+MERGE (p { uid: "1affe595-75da-4ed7-a628-b174467ccd97" })
+  ON CREATE
+ SET p = { uid: "1affe595-75da-4ed7-a628-b174467ccd97", label: "Toby Jones orders Olive Branch to make a payment" }
+  ON MATCH
+ SET p = { uid: "1affe595-75da-4ed7-a628-b174467ccd97", label: "Toby Jones orders Olive Branch to make a payment" }
+WITH n, p
+
+MATCH (p)-[existing_rel_to_delete:THING_ORDERED]->(currently_related_item)
+WHERE NOT currently_related_item.uid IN ["782dbfc8-04be-44e2-a89e-a450351dc0bc"]
+DELETE existing_rel_to_delete
+MERGE (n)-[:THING_ORDERED]->(p)
+
+MERGE (q { uid: "782dbfc8-04be-44e2-a89e-a450351dc0bc" })
+  ON CREATE
+ SET q = { uid: "782dbfc8-04be-44e2-a89e-a450351dc0bc", label: "Hamish McBeth makes payment" }
+  ON MATCH
+ SET q = { uid: "782dbfc8-04be-44e2-a89e-a450351dc0bc", label: "Hamish McBeth makes payment" }
+MERGE (p)-[:THING_ORDERED]-(q)
+
+RETURN n

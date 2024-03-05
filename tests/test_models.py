@@ -31,6 +31,7 @@ from pangloss_core_new.models import BaseNode
 
 from pangloss_core_new.model_setup.setup_utils import (
     __setup_find_cyclic_outgoing_references_for_edit__,
+    _get_concrete_node_classes,
 )
 
 
@@ -1517,3 +1518,94 @@ def test_circular_recursive_model():
             Payment.Edit,
         )
     )
+
+
+def test_as_reference_dict():
+    class Person(BaseNode):
+        name: str
+        age: int
+
+    ModelManager.initialise_models(depth=3)
+
+    person = Person(label="John Smith", name="John Smith", age=100)
+
+    assert person.as_reference_dict() == {
+        "uid": person.uid,
+        "label": "John Smith",
+        "real_type": "person",
+    }
+
+    assert person.as_reference_dict(relation_properties={"likelihood": 1})
+
+    assert person.as_reference_dict() == {
+        "uid": person.uid,
+        "label": "John Smith",
+        "real_type": "person",
+    }
+
+
+def test_edit_model_has_embedded_nodes():
+    class Pet(BaseNode):
+        name: str
+
+    class Inner(BaseNode):
+        name: str
+        inner_has_pet: typing.Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class OuterTypeOne(BaseNode):
+        inner: Embedded[Inner]
+        some_value: str
+        outer_one_has_pet: typing.Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class OuterTypeTwo(BaseNode):
+        inner: Embedded[Inner]
+        some_other_value: str
+        outer_two_has_pet: typing.Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    class Person(BaseNode):
+        outer: Embedded[OuterTypeOne | OuterTypeTwo]
+        person_has_pet: typing.Annotated[
+            RelationTo[Pet], RelationConfig(reverse_name="is_pet_of")
+        ]
+
+    ModelManager.initialise_models(depth=3)
+
+    john_smith_pet = Pet(label="John Smith's Pet", name="Truffles")
+
+    # outer_one_pet = Pet(label="Outer One Pet", name="Wuffles")
+
+    outer_two_pet = Pet(label="Outer Two Pet", name="Fluffles")
+
+    inner_pet = Pet(label="Inner Pet", name="Snuffles")
+
+    john_smith_edit = Person.Edit(
+        label="John Smith",
+        person_has_pet=[john_smith_pet.as_reference_dict()],
+        outer=[
+            {
+                "real_type": "outertypetwo",
+                "some_other_value": "SomeOtherValue",
+                "outer_two_has_pet": [outer_two_pet.as_reference_dict()],
+                "inner": [
+                    {
+                        "real_type": "inner",
+                        "name": "InnerEmbedded",
+                        "inner_has_pet": [inner_pet.as_reference_dict()],
+                    }
+                ],
+            }
+        ],
+    )
+
+    assert john_smith_edit.person_has_pet
+
+    assert john_smith_edit.outer[0].real_type == "outertypetwo"
+    assert john_smith_edit.outer[0].some_other_value == "SomeOtherValue"
+    assert john_smith_edit.outer[0].inner[0].real_type == "inner"
+    assert john_smith_edit.outer[0].inner[0].inner_has_pet[0].uid == inner_pet.uid

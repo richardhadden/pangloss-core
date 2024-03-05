@@ -1,53 +1,71 @@
-MATCH (x6cf722 {uid: $x29789d}) // Order, 8e475de4-e070-4e0a-b0c3-ebcecc915d80, Bertie Wooster orders Olive Branch to make a payment
+MATCH (x38fc8c {uid: $x2c50b8}) // Person, f34e8587-30eb-4c6f-8a0a-e42b3759eab1, John Smith
 
         
         
         
-        MERGE (x2549fd:Payment:BaseNode:CreateInline:ReadInline:EditInline:DeleteDetach {uid: $xf76638}) // Payment, 0041e4dd-643a-480c-9365-2dac8ab8b0df, Olive Branch makes payment
+        MERGE (x461897:OuterTypeTwo:BaseNode:Embedded:DeleteDetach {uid: $x255eab, real_type: $x7aba82}) // OuterTypeTwo, 0522fbb8-3aac-4d89-9a82-2f807bcf869c
         ON CREATE
        
             
-    SET x2549fd = $xcb5ab2 // {'uid': '0041e4dd-643a-480c-9365-2dac8ab8b0df', 'label': 'Olive Branch makes payment', 'how_much': 1, 'real_type': 'payment'}
+    SET x461897 = $x298860 // {'uid': '0522fbb8-3aac-4d89-9a82-2f807bcf869c', 'created_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913931), 'modified_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913936), 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}
     
             
         ON MATCH
             
-    SET x2549fd = $xcb5ab2 // {'uid': '0041e4dd-643a-480c-9365-2dac8ab8b0df', 'label': 'Olive Branch makes payment', 'how_much': 1, 'real_type': 'payment'}
+    SET x461897 = $x298860 // {'uid': '0522fbb8-3aac-4d89-9a82-2f807bcf869c', 'created_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913931), 'modified_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913936), 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}
     
         
-        WITH x6cf722, x2549fd // <<
+        WITH x461897, x38fc8c // <<
           
-    // ('PaymentEdit', UUID('0041e4dd-643a-480c-9365-2dac8ab8b0df'), 'Olive Branch makes payment')
+
+        
+        
+        
+        MERGE (xcee23b:Inner:BaseNode:Embedded:DeleteDetach {uid: $x48e99b, real_type: $xb7f567}) // Inner, 2566c085-c544-4532-9ad3-cf8e433122da
+        ON CREATE
+       
+            
+    SET xcee23b = $xd5493e // {'uid': '2566c085-c544-4532-9ad3-cf8e433122da', 'created_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913945), 'modified_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913947), 'name': 'InnerEmbedded', 'real_type': 'inner'}
+    
+            
+        ON MATCH
+            
+    SET xcee23b = $xd5493e // {'uid': '2566c085-c544-4532-9ad3-cf8e433122da', 'created_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913945), 'modified_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913947), 'name': 'InnerEmbedded', 'real_type': 'inner'}
+    
+        
+        WITH x461897, x38fc8c, xcee23b // <<
+          
+    // ('InnerEmbedded', UUID('2566c085-c544-4532-9ad3-cf8e433122da'))
     CALL { // Attach existing node if it is not attached
-        WITH x2549fd
-        UNWIND $x2e8fe9 AS updated_related_item_uid
+        WITH xcee23b
+        UNWIND $x348d6a AS updated_related_item_uid
             MATCH (node_to_relate {uid: updated_related_item_uid})
-            WHERE NOT (x2549fd)-[:PAYMENT_MADE_BY]->(node_to_relate)
-            CREATE (x2549fd)-[:PAYMENT_MADE_BY]->(node_to_relate)
+            WHERE NOT (xcee23b)-[:INNER_HAS_PET]->(node_to_relate)
+            CREATE (xcee23b)-[:INNER_HAS_PET]->(node_to_relate)
     }
-    // ('PaymentEdit', UUID('0041e4dd-643a-480c-9365-2dac8ab8b0df'), 'Olive Branch makes payment')
+    // ('InnerEmbedded', UUID('2566c085-c544-4532-9ad3-cf8e433122da'))
     CALL { // If not in list but is related, delete relation
-        WITH x2549fd
-        MATCH (x2549fd)-[existing_rel_to_delete:PAYMENT_MADE_BY]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $x2e8fe9
+        WITH xcee23b
+        MATCH (xcee23b)-[existing_rel_to_delete:INNER_HAS_PET]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $x348d6a
         DELETE existing_rel_to_delete
     }
     
         
         
         
-        MERGE (x6cf722)-[:THING_ORDERED]->(x2549fd)
+        MERGE (x461897)-[:INNER]->(xcee23b)
         
 
-      WITH x6cf722, x2549fd // <<<<
+      WITH x461897, x38fc8c, xcee23b // <<<<
         
-    WITH x6cf722, x2549fd // <<<<
+    WITH x461897, x38fc8c, xcee23b // <<<<
         
-    CALL { // cleanup from Bertie Wooster orders Olive Branch to make a payment
-       WITH x6cf722
-       MATCH (x6cf722)-[existing_rel_to_delete:THING_ORDERED]->(currently_related_item)
+    CALL  {
+       WITH x461897
+       MATCH (x461897)-[existing_rel_to_delete:INNER]->(currently_related_item)
        
-        WHERE NOT currently_related_item.uid IN $xdf6331
+        WHERE NOT currently_related_item.uid IN $x2360dd
         DELETE existing_rel_to_delete
         
         WITH currently_related_item
@@ -58,34 +76,70 @@ MATCH (x6cf722 {uid: $x29789d}) // Order, 8e475de4-e070-4e0a-b0c3-ebcecc915d80, 
            DETACH DELETE x 
            
         }
-           
-           
-        
-        
         
     }
-           
-            
-        
-    // ('OrderEdit', UUID('8e475de4-e070-4e0a-b0c3-ebcecc915d80'), 'Bertie Wooster orders Olive Branch to make a payment')
+    // ('OuterTypeTwoEmbedded', UUID('0522fbb8-3aac-4d89-9a82-2f807bcf869c'))
     CALL { // Attach existing node if it is not attached
-        WITH x6cf722
-        UNWIND $xae1c18 AS updated_related_item_uid
+        WITH x461897
+        UNWIND $x463e61 AS updated_related_item_uid
             MATCH (node_to_relate {uid: updated_related_item_uid})
-            WHERE NOT (x6cf722)-[:CARRIED_OUT_BY]->(node_to_relate)
-            CREATE (x6cf722)-[:CARRIED_OUT_BY]->(node_to_relate)
+            WHERE NOT (x461897)-[:OUTER_TWO_HAS_PET]->(node_to_relate)
+            CREATE (x461897)-[:OUTER_TWO_HAS_PET]->(node_to_relate)
     }
-    // ('OrderEdit', UUID('8e475de4-e070-4e0a-b0c3-ebcecc915d80'), 'Bertie Wooster orders Olive Branch to make a payment')
+    // ('OuterTypeTwoEmbedded', UUID('0522fbb8-3aac-4d89-9a82-2f807bcf869c'))
     CALL { // If not in list but is related, delete relation
-        WITH x6cf722
-        MATCH (x6cf722)-[existing_rel_to_delete:CARRIED_OUT_BY]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $xae1c18
+        WITH x461897
+        MATCH (x461897)-[existing_rel_to_delete:OUTER_TWO_HAS_PET]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $x463e61
         DELETE existing_rel_to_delete
     }
     
-    SET x6cf722 = $xbe1fbe // {'uid': '8e475de4-e070-4e0a-b0c3-ebcecc915d80', 'label': 'Bertie Wooster orders Olive Branch to make a payment', 'real_type': 'order'}
+        
+        
+        
+        MERGE (x38fc8c)-[:OUTER]->(x461897)
+        
+
+      WITH x461897, x38fc8c // <<<<
+        
+    WITH x461897, x38fc8c // <<<<
+        
+    CALL  {
+       WITH x38fc8c
+       MATCH (x38fc8c)-[existing_rel_to_delete:OUTER]->(currently_related_item)
+       
+        WHERE NOT currently_related_item.uid IN $xa57c12
+        DELETE existing_rel_to_delete
+        
+        WITH currently_related_item
+        CALL {
+                       WITH currently_related_item
+            MATCH delete_path = (currently_related_item:DeleteDetach)(()-->(:DeleteDetach)){0,}(:DeleteDetach) 
+            UNWIND nodes(delete_path) as x
+           DETACH DELETE x 
+           
+        }
+        
+    }
+    // ('PersonEdit', UUID('f34e8587-30eb-4c6f-8a0a-e42b3759eab1'))
+    CALL { // Attach existing node if it is not attached
+        WITH x38fc8c
+        UNWIND $xe2e7f5 AS updated_related_item_uid
+            MATCH (node_to_relate {uid: updated_related_item_uid})
+            WHERE NOT (x38fc8c)-[:PERSON_HAS_PET]->(node_to_relate)
+            CREATE (x38fc8c)-[:PERSON_HAS_PET]->(node_to_relate)
+    }
+    // ('PersonEdit', UUID('f34e8587-30eb-4c6f-8a0a-e42b3759eab1'))
+    CALL { // If not in list but is related, delete relation
+        WITH x38fc8c
+        MATCH (x38fc8c)-[existing_rel_to_delete:PERSON_HAS_PET]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $xe2e7f5
+        DELETE existing_rel_to_delete
+    }
     
+    SET x38fc8c = $x3837fa // {'uid': 'f34e8587-30eb-4c6f-8a0a-e42b3759eab1', 'label': 'John Smith', 'created_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913997), 'modified_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913998), 'real_type': 'person'}
+    RETURN x38fc8c{.uid}
 
 
 
-{'x29789d': '8e475de4-e070-4e0a-b0c3-ebcecc915d80', 'xbe1fbe': {'uid': '8e475de4-e070-4e0a-b0c3-ebcecc915d80', 'label': 'Bertie Wooster orders Olive Branch to make a payment', 'real_type': 'order'}, 'xdf6331': ['0041e4dd-643a-480c-9365-2dac8ab8b0df'], 'xf76638': '0041e4dd-643a-480c-9365-2dac8ab8b0df', 'xcb5ab2': {'uid': '0041e4dd-643a-480c-9365-2dac8ab8b0df', 'label': 'Olive Branch makes payment', 'how_much': 1, 'real_type': 'payment'}, 'x2e8fe9': ['e78b1c01-7c20-4f9d-b443-23f1f18fb16a'], 'xae1c18': ['8404491e-946e-4af7-bb56-6041fe7b7817']}
+{'x2c50b8': 'f34e8587-30eb-4c6f-8a0a-e42b3759eab1', 'x3837fa': {'uid': 'f34e8587-30eb-4c6f-8a0a-e42b3759eab1', 'label': 'John Smith', 'created_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913997), 'modified_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913998), 'real_type': 'person'}, 'xa57c12': ['0522fbb8-3aac-4d89-9a82-2f807bcf869c'], 'x255eab': '0522fbb8-3aac-4d89-9a82-2f807bcf869c', 'x7aba82': 'outertypetwo', 'x298860': {'uid': '0522fbb8-3aac-4d89-9a82-2f807bcf869c', 'created_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913931), 'modified_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913936), 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}, 'x2360dd': ['2566c085-c544-4532-9ad3-cf8e433122da'], 'x48e99b': '2566c085-c544-4532-9ad3-cf8e433122da', 'xb7f567': 'inner', 'xd5493e': {'uid': '2566c085-c544-4532-9ad3-cf8e433122da', 'created_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913945), 'modified_when': datetime.datetime(2024, 3, 5, 11, 59, 36, 913947), 'name': 'InnerEmbedded', 'real_type': 'inner'}, 'x348d6a': ['f38cadd9-8b40-4524-a685-17ceb005f111'], 'x463e61': ['83d1646d-d5b9-45f6-8155-0cc2f8d98af6'], 'xe2e7f5': ['22d3de1a-d371-4e70-bf4b-a83749229745']}

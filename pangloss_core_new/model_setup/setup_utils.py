@@ -192,6 +192,12 @@ def __setup_update_embedded_definitions__(cls: type[AbstractBaseNode]) -> None:
                 annotation=annotation
             )
 
+            # Not immediately clear why this check is needed; should be set up by ModelManager
+            # before running this function. But it seems defining classes out of order results
+            # in a state where it has not been set up.
+            if not getattr(cls, "embedded_nodes", False):
+                cls.embedded_nodes = {}
+
             cls.embedded_nodes[field_name] = _EmbeddedNodeDefinition(
                 embedded_class=updated_config.embedded_node_base,
                 embedded_config=updated_config,
@@ -817,6 +823,23 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
                 ],
                 pydantic.Field(default_factory=list, discriminator="real_type"),
             )
+    embedded_new_defs = {}
+
+    for embedded_name, embedded_definition in cls.embedded_nodes.items():
+        all_embedded_types = set()
+        for concrete_embedded_type in _get_concrete_node_classes(
+            embedded_definition.embedded_class, include_subclasses=True
+        ):
+            all_embedded_types.add(concrete_embedded_type.Embedded)
+
+        embedded_new_defs[embedded_name] = (
+            typing.Annotated[
+                list[typing.Union[*all_embedded_types]],  # type: ignore
+                embedded_definition.embedded_config.validators,
+                embedded_definition.embedded_config,
+            ],
+            pydantic.Field(default_factory=list, discriminator="real_type"),
+        )
 
     edit_model = pydantic.create_model(
         f"{cls.__name__}Edit",
@@ -828,6 +851,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
         real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
         base_class=(typing.ClassVar[AbstractBaseNode], cls),
         **outgoing_relation_new_defs,
+        **embedded_new_defs,
     )
 
     for property_name, property in cls.property_fields.items():
