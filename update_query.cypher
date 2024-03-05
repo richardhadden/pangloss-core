@@ -1,71 +1,71 @@
-MATCH (xe5e04b {uid: $x2b1aa7}) // Person, 7b7dc9d9-e480-4f29-a90c-14277c9becd8, John Smith
+MATCH (xe19f97 {uid: $x300ffb}) // Person, 80215763-ea74-462e-b4ce-649c24bd7127, John Smith
 
         
         
         
-        MERGE (x4d1a10:OuterTypeTwo:BaseNode:Embedded:DeleteDetach {uid: $x3c154d, real_type: $x0f6fce}) // OuterTypeTwo, 7c2e55ff-1b4a-46af-8bba-2394a3487295
+        MERGE (x2c2252:OuterTypeTwo:BaseNode:Embedded:DeleteDetach {uid: $xf9842b, real_type: $x4f4b37}) // OuterTypeTwo, 0b533575-7f09-4441-b934-6c9e22ca6eca
         ON CREATE
        
             
-    SET x4d1a10 = apoc.map.merge($x8a17ef, {created_when: coalesce(x4d1a10.created_when, datetime()), modified_when: datetime()}) // {'uid': '7c2e55ff-1b4a-46af-8bba-2394a3487295', 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}
+    SET x2c2252 = apoc.map.merge($xf8ea47, {created_when: coalesce(x2c2252.created_when, datetime()), modified_when: datetime()}) // {'uid': '0b533575-7f09-4441-b934-6c9e22ca6eca', 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}
     
             
         ON MATCH
             
-    SET x4d1a10 = apoc.map.merge($x8a17ef, {created_when: coalesce(x4d1a10.created_when, datetime()), modified_when: datetime()}) // {'uid': '7c2e55ff-1b4a-46af-8bba-2394a3487295', 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}
+    SET x2c2252 = apoc.map.merge($xf8ea47, {created_when: coalesce(x2c2252.created_when, datetime()), modified_when: datetime()}) // {'uid': '0b533575-7f09-4441-b934-6c9e22ca6eca', 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}
     
         
-        WITH x4d1a10, xe5e04b // <<
+        WITH xe19f97, x2c2252 // <<
           
 
         
         
         
-        MERGE (x80fdec:Inner:BaseNode:Embedded:DeleteDetach {uid: $x77c762, real_type: $xc83c0a}) // Inner, 5863b2eb-3b93-492a-ab41-da13f9686285
+        MERGE (xd5d17e:Inner:BaseNode:Embedded:DeleteDetach {uid: $x3b44dc, real_type: $xb2899d}) // Inner, e1a90535-fdb5-4f5e-9732-82ecb01fd392
         ON CREATE
        
             
-    SET x80fdec = apoc.map.merge($xea6925, {created_when: coalesce(x80fdec.created_when, datetime()), modified_when: datetime()}) // {'uid': '5863b2eb-3b93-492a-ab41-da13f9686285', 'name': 'InnerEmbedded', 'real_type': 'inner'}
+    SET xd5d17e = apoc.map.merge($xa1c101, {created_when: coalesce(xd5d17e.created_when, datetime()), modified_when: datetime()}) // {'uid': 'e1a90535-fdb5-4f5e-9732-82ecb01fd392', 'name': 'InnerEmbedded', 'real_type': 'inner'}
     
             
         ON MATCH
             
-    SET x80fdec = apoc.map.merge($xea6925, {created_when: coalesce(x80fdec.created_when, datetime()), modified_when: datetime()}) // {'uid': '5863b2eb-3b93-492a-ab41-da13f9686285', 'name': 'InnerEmbedded', 'real_type': 'inner'}
+    SET xd5d17e = apoc.map.merge($xa1c101, {created_when: coalesce(xd5d17e.created_when, datetime()), modified_when: datetime()}) // {'uid': 'e1a90535-fdb5-4f5e-9732-82ecb01fd392', 'name': 'InnerEmbedded', 'real_type': 'inner'}
     
         
-        WITH x4d1a10, xe5e04b, x80fdec // <<
+        WITH xd5d17e, xe19f97, x2c2252 // <<
           
-    // ('InnerEmbedded', UUID('5863b2eb-3b93-492a-ab41-da13f9686285'))
+    // ('InnerEmbedded', UUID('e1a90535-fdb5-4f5e-9732-82ecb01fd392'))
     CALL { // Attach existing node if it is not attached
-        WITH x80fdec
-        UNWIND $x69f6b8 AS updated_related_item_uid
+        WITH xd5d17e
+        UNWIND $x1099d3 AS updated_related_item_uid
             MATCH (node_to_relate {uid: updated_related_item_uid})
-            WHERE NOT (x80fdec)-[:INNER_HAS_PET]->(node_to_relate)
-            CREATE (x80fdec)-[:INNER_HAS_PET]->(node_to_relate)
+            WHERE NOT (xd5d17e)-[:INNER_HAS_PET]->(node_to_relate)
+            CREATE (xd5d17e)-[:INNER_HAS_PET]->(node_to_relate)
     }
-    // ('InnerEmbedded', UUID('5863b2eb-3b93-492a-ab41-da13f9686285'))
+    // ('InnerEmbedded', UUID('e1a90535-fdb5-4f5e-9732-82ecb01fd392'))
     CALL { // If not in list but is related, delete relation
-        WITH x80fdec
-        MATCH (x80fdec)-[existing_rel_to_delete:INNER_HAS_PET]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $x69f6b8
+        WITH xd5d17e
+        MATCH (xd5d17e)-[existing_rel_to_delete:INNER_HAS_PET]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $x1099d3
         DELETE existing_rel_to_delete
     }
     
         
         
         
-        MERGE (x4d1a10)-[:INNER]->(x80fdec)
+        MERGE (x2c2252)-[:INNER]->(xd5d17e)
         
 
-      WITH x4d1a10, xe5e04b, x80fdec // <<<<
+      WITH xd5d17e, xe19f97, x2c2252 // <<<<
         
-    WITH x4d1a10, xe5e04b, x80fdec // <<<<
+    WITH xd5d17e, xe19f97, x2c2252 // <<<<
         
     CALL  {
-       WITH x4d1a10
-       MATCH (x4d1a10)-[existing_rel_to_delete:INNER]->(currently_related_item)
+       WITH x2c2252
+       MATCH (x2c2252)-[existing_rel_to_delete:INNER]->(currently_related_item)
        
-        WHERE NOT currently_related_item.uid IN $x7963c9
+        WHERE NOT currently_related_item.uid IN $x637b0a
         DELETE existing_rel_to_delete
         
         WITH currently_related_item
@@ -78,37 +78,37 @@ MATCH (xe5e04b {uid: $x2b1aa7}) // Person, 7b7dc9d9-e480-4f29-a90c-14277c9becd8,
         }
         
     }
-    // ('OuterTypeTwoEmbedded', UUID('7c2e55ff-1b4a-46af-8bba-2394a3487295'))
+    // ('OuterTypeTwoEmbedded', UUID('0b533575-7f09-4441-b934-6c9e22ca6eca'))
     CALL { // Attach existing node if it is not attached
-        WITH x4d1a10
-        UNWIND $x907920 AS updated_related_item_uid
+        WITH x2c2252
+        UNWIND $x9ba4f0 AS updated_related_item_uid
             MATCH (node_to_relate {uid: updated_related_item_uid})
-            WHERE NOT (x4d1a10)-[:OUTER_TWO_HAS_PET]->(node_to_relate)
-            CREATE (x4d1a10)-[:OUTER_TWO_HAS_PET]->(node_to_relate)
+            WHERE NOT (x2c2252)-[:OUTER_TWO_HAS_PET]->(node_to_relate)
+            CREATE (x2c2252)-[:OUTER_TWO_HAS_PET]->(node_to_relate)
     }
-    // ('OuterTypeTwoEmbedded', UUID('7c2e55ff-1b4a-46af-8bba-2394a3487295'))
+    // ('OuterTypeTwoEmbedded', UUID('0b533575-7f09-4441-b934-6c9e22ca6eca'))
     CALL { // If not in list but is related, delete relation
-        WITH x4d1a10
-        MATCH (x4d1a10)-[existing_rel_to_delete:OUTER_TWO_HAS_PET]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $x907920
+        WITH x2c2252
+        MATCH (x2c2252)-[existing_rel_to_delete:OUTER_TWO_HAS_PET]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $x9ba4f0
         DELETE existing_rel_to_delete
     }
     
         
         
         
-        MERGE (xe5e04b)-[:OUTER]->(x4d1a10)
+        MERGE (xe19f97)-[:OUTER]->(x2c2252)
         
 
-      WITH x4d1a10, xe5e04b // <<<<
+      WITH xe19f97, x2c2252 // <<<<
         
-    WITH x4d1a10, xe5e04b // <<<<
+    WITH xe19f97, x2c2252 // <<<<
         
     CALL  {
-       WITH xe5e04b
-       MATCH (xe5e04b)-[existing_rel_to_delete:OUTER]->(currently_related_item)
+       WITH xe19f97
+       MATCH (xe19f97)-[existing_rel_to_delete:OUTER]->(currently_related_item)
        
-        WHERE NOT currently_related_item.uid IN $x1d62ac
+        WHERE NOT currently_related_item.uid IN $x27000c
         DELETE existing_rel_to_delete
         
         WITH currently_related_item
@@ -121,25 +121,25 @@ MATCH (xe5e04b {uid: $x2b1aa7}) // Person, 7b7dc9d9-e480-4f29-a90c-14277c9becd8,
         }
         
     }
-    // ('PersonEdit', UUID('7b7dc9d9-e480-4f29-a90c-14277c9becd8'))
+    // ('PersonEdit', UUID('80215763-ea74-462e-b4ce-649c24bd7127'))
     CALL { // Attach existing node if it is not attached
-        WITH xe5e04b
-        UNWIND $x065540 AS updated_related_item_uid
+        WITH xe19f97
+        UNWIND $x7db799 AS updated_related_item_uid
             MATCH (node_to_relate {uid: updated_related_item_uid})
-            WHERE NOT (xe5e04b)-[:PERSON_HAS_PET]->(node_to_relate)
-            CREATE (xe5e04b)-[:PERSON_HAS_PET]->(node_to_relate)
+            WHERE NOT (xe19f97)-[:PERSON_HAS_PET]->(node_to_relate)
+            CREATE (xe19f97)-[:PERSON_HAS_PET]->(node_to_relate)
     }
-    // ('PersonEdit', UUID('7b7dc9d9-e480-4f29-a90c-14277c9becd8'))
+    // ('PersonEdit', UUID('80215763-ea74-462e-b4ce-649c24bd7127'))
     CALL { // If not in list but is related, delete relation
-        WITH xe5e04b
-        MATCH (xe5e04b)-[existing_rel_to_delete:PERSON_HAS_PET]->(currently_related_item)
-        WHERE NOT currently_related_item.uid IN $x065540
+        WITH xe19f97
+        MATCH (xe19f97)-[existing_rel_to_delete:PERSON_HAS_PET]->(currently_related_item)
+        WHERE NOT currently_related_item.uid IN $x7db799
         DELETE existing_rel_to_delete
     }
     
-    SET xe5e04b = apoc.map.merge($x590af2, {created_when: coalesce(xe5e04b.created_when, datetime()), modified_when: datetime()}) // {'uid': '7b7dc9d9-e480-4f29-a90c-14277c9becd8', 'label': 'John Smith', 'real_type': 'person'}
-    RETURN xe5e04b{.uid}
+    SET xe19f97 = apoc.map.merge($x152d99, {created_when: coalesce(xe19f97.created_when, datetime()), modified_when: datetime()}) // {'uid': '80215763-ea74-462e-b4ce-649c24bd7127', 'label': 'John Smith', 'real_type': 'person'}
+    RETURN xe19f97{.uid}
 
 
 
-{'x2b1aa7': '7b7dc9d9-e480-4f29-a90c-14277c9becd8', 'x590af2': {'uid': '7b7dc9d9-e480-4f29-a90c-14277c9becd8', 'label': 'John Smith', 'real_type': 'person'}, 'x1d62ac': ['7c2e55ff-1b4a-46af-8bba-2394a3487295'], 'x3c154d': '7c2e55ff-1b4a-46af-8bba-2394a3487295', 'x0f6fce': 'outertypetwo', 'x8a17ef': {'uid': '7c2e55ff-1b4a-46af-8bba-2394a3487295', 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}, 'x7963c9': ['5863b2eb-3b93-492a-ab41-da13f9686285'], 'x77c762': '5863b2eb-3b93-492a-ab41-da13f9686285', 'xc83c0a': 'inner', 'xea6925': {'uid': '5863b2eb-3b93-492a-ab41-da13f9686285', 'name': 'InnerEmbedded', 'real_type': 'inner'}, 'x69f6b8': ['7f3631aa-d5d1-412e-baf3-2ded7f6453c2'], 'x907920': ['536f7817-cd35-4507-8485-9e55edd5209e'], 'x065540': ['fab70678-f233-4440-b363-4d056438b234']}
+{'x300ffb': '80215763-ea74-462e-b4ce-649c24bd7127', 'x152d99': {'uid': '80215763-ea74-462e-b4ce-649c24bd7127', 'label': 'John Smith', 'real_type': 'person'}, 'x27000c': ['0b533575-7f09-4441-b934-6c9e22ca6eca'], 'xf9842b': '0b533575-7f09-4441-b934-6c9e22ca6eca', 'x4f4b37': 'outertypetwo', 'xf8ea47': {'uid': '0b533575-7f09-4441-b934-6c9e22ca6eca', 'some_other_value': 'SomeValue', 'real_type': 'outertypetwo'}, 'x637b0a': ['e1a90535-fdb5-4f5e-9732-82ecb01fd392'], 'x3b44dc': 'e1a90535-fdb5-4f5e-9732-82ecb01fd392', 'xb2899d': 'inner', 'xa1c101': {'uid': 'e1a90535-fdb5-4f5e-9732-82ecb01fd392', 'name': 'InnerEmbedded', 'real_type': 'inner'}, 'x1099d3': ['71408889-4daf-4c56-90f9-0c67cc2dcf11'], 'x9ba4f0': ['43c792e2-f27c-4b8a-acdc-96a17ea83278'], 'x7db799': ['697414be-862c-47e7-bf56-d2db4dfacd4f']}
