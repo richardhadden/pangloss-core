@@ -1,25 +1,25 @@
 
-        MATCH (x0abced {uid: $xd0967c})
+        MATCH (x39afaf {uid: $xe7025c})
 
-        MATCH (xe268e4 {uid: $xe4e115})
+        MATCH (x31ef49 {uid: $x0469d4})
 
-        MATCH (x36e789 {uid: $x92abf5})
-        CREATE (xbf73dd:Person:BaseNode {uid: $xb7bb5e, label: $x2927c1, created_when: $x195304, modified_when: $x3b2f25, real_type: $x006466})
+        MATCH (x30744c {uid: $x3090e2})
+        CREATE (x3eb498:Person:BaseNode {uid: $x781f4b, label: $x63212b, real_type: $xea3356})
 
-        CREATE (x9e35ee:OuterTypeOne:BaseNode:Embedded:DeleteDetach {uid: $x3de99a, created_when: $x05c39c, modified_when: $xb4a675, some_value: $x3736ea, real_type: $x9110a0})
+        CREATE (xe975ed:OuterTypeOne:BaseNode:Embedded:DeleteDetach {uid: $x312fe6, some_value: $xb303ba, real_type: $xb96db6})
 
-        CREATE (x1ca976:Inner:BaseNode:Embedded:DeleteDetach {uid: $xb51d82, created_when: $x271a58, modified_when: $x9ee2aa, name: $x1cec64, real_type: $x7bf7f4})
+        CREATE (x7378f3:Inner:BaseNode:Embedded:DeleteDetach {uid: $xbc9100, name: $x9db73b, real_type: $x42e294})
 
-        CREATE (x1ca976)-[:INNER_HAS_PET {reverse_name: $x076ad6, relation_labels: $x584e0c}]->(x0abced)
+        CREATE (x7378f3)-[:INNER_HAS_PET {reverse_name: $x39523b, relation_labels: $x557ffa}]->(x39afaf)
 
-        CREATE (x9e35ee)-[:INNER]->(x1ca976)
+        CREATE (xe975ed)-[:INNER]->(x7378f3)
 
-        CREATE (x9e35ee)-[:OUTER_ONE_HAS_PET {reverse_name: $x66b61e, relation_labels: $xf5a073}]->(xe268e4)
+        CREATE (xe975ed)-[:OUTER_ONE_HAS_PET {reverse_name: $x218428, relation_labels: $xbaf22e}]->(x31ef49)
 
-        CREATE (xbf73dd)-[:OUTER]->(x9e35ee)
+        CREATE (x3eb498)-[:OUTER]->(xe975ed)
 
-        CREATE (xbf73dd)-[:PERSON_HAS_PET {reverse_name: $x5b4eb0, relation_labels: $x6f28ef}]->(x36e789)
+        CREATE (x3eb498)-[:PERSON_HAS_PET {reverse_name: $xc81edc, relation_labels: $x01e46a}]->(x30744c)
         
         
-        return xbf73dd{.uid, .label, .real_type}
-        {'xb7bb5e': '4c8e917b-5dc3-43c9-89ed-b3dac8143dc8', 'x2927c1': 'John Smith', 'x195304': datetime.datetime(2024, 3, 5, 11, 59, 36, 848120), 'x3b2f25': datetime.datetime(2024, 3, 5, 11, 59, 36, 848125), 'x006466': 'person', 'x3de99a': 'acfe359b-85e0-4841-a4c4-e57ce31a2e67', 'x05c39c': datetime.datetime(2024, 3, 5, 11, 59, 36, 848240), 'xb4a675': datetime.datetime(2024, 3, 5, 11, 59, 36, 848244), 'x3736ea': 'SomeValue', 'x9110a0': 'outertypeone', 'xb51d82': '73304984-83c8-46bd-aaa2-c4b4f24ae165', 'x271a58': datetime.datetime(2024, 3, 5, 11, 59, 36, 848256), 'x9ee2aa': datetime.datetime(2024, 3, 5, 11, 59, 36, 848257), 'x1cec64': 'InnerEmbedded', 'x7bf7f4': 'inner', 'x076ad6': 'is_pet_of', 'x584e0c': [], 'xd0967c': 'f38cadd9-8b40-4524-a685-17ceb005f111', 'x66b61e': 'is_pet_of', 'xf5a073': [], 'xe4e115': 'ad5db063-3640-47e1-b0cb-d9013099f24b', 'x5b4eb0': 'is_pet_of', 'x6f28ef': [], 'x92abf5': '22d3de1a-d371-4e70-bf4b-a83749229745'}
+        return x3eb498{.uid, .label, .real_type}
+        {'x781f4b': '07604ed7-85fd-48a3-9da6-0c498c4e5857', 'x63212b': 'John Smith', 'xea3356': 'person', 'x312fe6': '1a4bfe1f-b465-4407-9dcc-ff99d0c20932', 'xb303ba': 'SomeValue', 'xb96db6': 'outertypeone', 'xbc9100': 'cf76cb82-7ac4-4f21-93aa-5a8413908e38', 'x9db73b': 'InnerEmbedded', 'x42e294': 'inner', 'x39523b': 'is_pet_of', 'x557ffa': [], 'xe7025c': '446f9df4-dc0b-4cf3-a03f-9c6362c28b91', 'x218428': 'is_pet_of', 'xbaf22e': [], 'x0469d4': '1bb412fd-ee05-49bc-9c6b-c9e66e1e9124', 'xc81edc': 'is_pet_of', 'x01e46a': [], 'x3090e2': '671027e2-29a6-41bb-bb1d-0cd1a034d022'}
