@@ -1097,9 +1097,12 @@ def test_contruct_view_type_basic():
         ]
 
     ModelManager.initialise_models(depth=3)
+    import neo4j.time
 
     Pet.View(
         uid=uuid.uuid4(),
+        created_when=neo4j.time.DateTime.utc_now(),
+        modified_when=neo4j.time.DateTime.utc_now(),
         label="Something",
         name="Something",
         is_pet_of=[{"uid": uuid.uuid4(), "label": "John Smith", "real_type": "person"}],
@@ -1119,6 +1122,8 @@ def test_contruct_view_type_basic():
 
     Pet.View(
         uid=uuid.uuid4(),
+        created_when=neo4j.time.DateTime.utc_now(),
+        modified_when=neo4j.time.DateTime.utc_now(),
         label="Something",
         name="Something",
         is_pet_of=[{"uid": uuid.uuid4(), "label": "John Smith", "real_type": "person"}],

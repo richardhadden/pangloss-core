@@ -144,14 +144,13 @@ async def test_model_with_relations(clear_database):
 
     result = await Thing.get_view(uid=thing.uid)
 
-    assert result == Thing.View(
-        label="The Thing",
-        name="The Thing",
-        uid=thing.uid,
-        pets=[
-            {"uid": mister_fluffy.uid, "label": mister_fluffy.label, "real_type": "cat"}
-        ],
-    )
+    assert result
+    assert result.label == "The Thing"
+    assert result.name == "The Thing"
+    assert result.uid == thing.uid
+    assert result.pets[0].uid == mister_fluffy.uid
+    assert result.pets[0].label == mister_fluffy.label
+    assert result.pets[0].real_type == "cat"
 
 
 @pytest.mark.asyncio
@@ -954,7 +953,7 @@ async def test_update_properties(clear_database):
 
 
 @pytest.mark.asyncio
-async def test_update_basic_relations(clear_database):
+async def test_update_basic_relations():
     class Pet(BaseNode):
         pass
 
@@ -1130,6 +1129,10 @@ async def test_update_inline_editable_relation(clear_database):
     assert len(person_read.pets) == 1
     assert person_read.pets[0].label == "Truffle"
 
+    pet_in_db = await Pet.View.get(uid=person_read.pets[0].uid)
+    assert pet_in_db.created_when
+    assert pet_in_db.modified_when
+
     # By replacing Fluffle and Wuffle with Truffle, these two should
     # now be deleted
     with pytest.raises(PanglossNotFoundError):
@@ -1142,7 +1145,7 @@ async def test_update_inline_editable_relation(clear_database):
 
 
 @pytest.mark.asyncio
-async def test_update_double_embedded_objects(clear_database):
+async def test_update_double_embedded_objects():
     await Database.dangerously_clear_database()
     from typing import Union
 

@@ -68,6 +68,8 @@ def unpack_properties_to_create_props_and_param_dict(
         node.__class__.__name__.replace("Embedded", "").replace("Edit", "").lower()
     )
     q_pairs.append(f"""real_type: ${real_type_id}""")
+    q_pairs.append("""created_when: datetime()""")
+    q_pairs.append("""modified_when: datetime()""")
     return "{" + ", ".join(q_pairs) + "}", params
 
 
@@ -582,7 +584,7 @@ def build_node_update_query_and_params(
     properties_dict_param = get_unique_string()
     params: dict[str, Any] = {properties_dict_param: properties_dict}
     update_set_query = f"""
-    SET {node_identifier} = ${properties_dict_param} // {properties_dict}
+    SET {node_identifier} = apoc.map.merge(${properties_dict_param}, {{created_when: coalesce({node_identifier}.created_when, datetime()), modified_when: datetime()}}) // {properties_dict}
     """
     update_relations_query = ""
     for embedded_name, embedded_definition in node.base_class.embedded_nodes.items():

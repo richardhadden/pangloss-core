@@ -4,6 +4,7 @@ import typing
 import uuid
 
 import pydantic
+import neo4j.time
 
 from pangloss_core_new.exceptions import PanglossConfigError
 from pangloss_core_new.model_setup.config_definitions import (
@@ -30,9 +31,20 @@ class EmbeddedNodeBase(SubNodeProxy):
 
 
 class ViewNodeBase(SubNodeProxy):
+    created_when: datetime.datetime
+    modified_when: datetime.datetime
+
     @classmethod
     def get(cls, uid: uuid.UUID) -> typing.Awaitable[typing.Self | None]:
         return cls.base_class.get_view(uid)  # type: ignore
+
+    @pydantic.field_validator("created_when", mode="before")
+    def transform_created_when(cls, raw: neo4j.time.DateTime) -> datetime.datetime:
+        return raw.to_native()
+
+    @pydantic.field_validator("modified_when", mode="before")
+    def transform_modified_when(cls, raw: neo4j.time.DateTime) -> datetime.datetime:
+        return raw.to_native()
 
 
 class EditNodeBase(SubNodeProxy):
