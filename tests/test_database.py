@@ -10,26 +10,26 @@ import pytest_asyncio
 from neo4j import Record
 
 
-from pangloss_core_new.database import (
+from pangloss_core.database import (
     Database,
     Transaction,
     read_transaction,
     write_transaction,
 )
-from pangloss_core_new.model_setup.model_manager import ModelManager
-from pangloss_core_new.model_setup.relation_properties_model import (
+from pangloss_core.model_setup.model_manager import ModelManager
+from pangloss_core.model_setup.relation_properties_model import (
     RelationPropertiesModel,
 )
-from pangloss_core_new.model_setup.embedded import Embedded
-from pangloss_core_new.models import BaseNode
-from pangloss_core_new.model_setup.base_node_definitions import BaseNonHeritableMixin
-from pangloss_core_new.model_setup.relation_to import (
+from pangloss_core.model_setup.embedded import Embedded
+from pangloss_core.models import BaseNode
+from pangloss_core.model_setup.base_node_definitions import BaseNonHeritableMixin
+from pangloss_core.model_setup.relation_to import (
     RelationTo,
     RelationConfig,
     ReifiedRelation,
     ReifiedTargetConfig,
 )
-from pangloss_core_new.exceptions import PanglossNotFoundError, PanglossCreateError
+from pangloss_core.exceptions import PanglossNotFoundError, PanglossCreateError
 
 FAKE_UID = uuid.UUID("a19c71f4-a844-458d-82eb-527307f89aab")
 

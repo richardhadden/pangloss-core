@@ -6,12 +6,12 @@ import annotated_types
 
 
 if typing.TYPE_CHECKING:
-    from pangloss_core_new.model_setup.base_node_definitions import (
+    from pangloss_core.model_setup.base_node_definitions import (
         AbstractBaseNode,
         BaseMixin,
         BaseNonHeritableMixin,
     )
-    from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
+    from pangloss_core.model_setup.reference_node_base import BaseNodeReference
     from relation_to import ReifiedRelation
     from relation_properties_model import RelationPropertiesModel
 

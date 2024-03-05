@@ -1,10 +1,10 @@
 import typing
 
-from pangloss_core_new.model_setup.setup_utils import (
+from pangloss_core.model_setup.setup_utils import (
     _get_all_subclasses,
     _get_concrete_node_classes,
 )
-from pangloss_core_new.models import BaseNode
+from pangloss_core.models import BaseNode
 
 
 def test_get_all_subclasses():

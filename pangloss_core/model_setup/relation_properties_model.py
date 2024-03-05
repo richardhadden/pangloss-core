@@ -1,4 +1,4 @@
-from pangloss_core_new.model_setup.models_base import CamelModel
+from pangloss_core.model_setup.models_base import CamelModel
 
 
 class RelationPropertiesModel(CamelModel):

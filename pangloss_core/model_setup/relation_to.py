@@ -6,10 +6,10 @@ import uuid
 import pydantic
 import pydantic_core
 
-from pangloss_core_new.model_setup.models_base import CamelModel
+from pangloss_core.model_setup.models_base import CamelModel
 
 
-from pangloss_core_new.model_setup.config_definitions import RelationConfig
+from pangloss_core.model_setup.config_definitions import RelationConfig
 
 
 class RelationTo[T](typing.Sequence[T]):

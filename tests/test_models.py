@@ -6,30 +6,30 @@ import uuid
 import annotated_types
 import pytest
 
-from pangloss_core_new.exceptions import PanglossConfigError
+from pangloss_core.exceptions import PanglossConfigError
 
-from pangloss_core_new.model_setup.base_node_definitions import (
+from pangloss_core.model_setup.base_node_definitions import (
     BaseNonHeritableMixin,
     EditNodeBase,
 )
-from pangloss_core_new.model_setup.config_definitions import (
+from pangloss_core.model_setup.config_definitions import (
     EmbeddedConfig,
     RelationConfig,
 )
-from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
-from pangloss_core_new.model_setup.relation_properties_model import (
+from pangloss_core.model_setup.reference_node_base import BaseNodeReference
+from pangloss_core.model_setup.relation_properties_model import (
     RelationPropertiesModel,
 )
-from pangloss_core_new.model_setup.embedded import Embedded
-from pangloss_core_new.model_setup.model_manager import ModelManager
-from pangloss_core_new.model_setup.relation_to import (
+from pangloss_core.model_setup.embedded import Embedded
+from pangloss_core.model_setup.model_manager import ModelManager
+from pangloss_core.model_setup.relation_to import (
     RelationTo,
     ReifiedRelation,
     ReifiedTargetConfig,
 )
-from pangloss_core_new.models import BaseNode
+from pangloss_core.models import BaseNode
 
-from pangloss_core_new.model_setup.setup_utils import (
+from pangloss_core.model_setup.setup_utils import (
     __setup_find_cyclic_outgoing_references_for_edit__,
     _get_concrete_node_classes,
 )

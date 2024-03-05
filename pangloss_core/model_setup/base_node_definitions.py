@@ -6,17 +6,17 @@ import uuid
 import pydantic
 import neo4j.time
 
-from pangloss_core_new.exceptions import PanglossConfigError
-from pangloss_core_new.model_setup.config_definitions import (
+from pangloss_core.exceptions import PanglossConfigError
+from pangloss_core.model_setup.config_definitions import (
     _EmbeddedNodeDefinition,
     _IncomingRelationDefinition,
     _IncomingReifiedRelationDefinition,
     _OutgoingRelationDefinition,
     _OutgoingReifiedRelationDefinition,
 )
-from pangloss_core_new.model_setup.models_base import BaseNodeStandardFields
-from pangloss_core_new.model_setup.subnode_proxy import SubNodeProxy
-from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
+from pangloss_core.model_setup.models_base import BaseNodeStandardFields
+from pangloss_core.model_setup.subnode_proxy import SubNodeProxy
+from pangloss_core.model_setup.reference_node_base import BaseNodeReference
 
 
 class ReferenceDict(typing.TypedDict):

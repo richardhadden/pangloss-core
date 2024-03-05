@@ -4,18 +4,18 @@ import inspect
 import typing
 import uuid
 from typing import Any
-from pangloss_core_new.model_setup.base_node_definitions import (
+from pangloss_core.model_setup.base_node_definitions import (
     EditNodeBase,
     EmbeddedNodeBase,
 )
 
 
 if typing.TYPE_CHECKING:
-    from pangloss_core_new.model_setup.base_node_definitions import (
+    from pangloss_core.model_setup.base_node_definitions import (
         AbstractBaseNode,
     )
 
-from pangloss_core_new.model_setup.relation_to import ReifiedRelation
+from pangloss_core.model_setup.relation_to import ReifiedRelation
 
 
 def get_unique_string():

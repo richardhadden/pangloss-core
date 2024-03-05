@@ -8,19 +8,19 @@ import typing
 import annotated_types
 import pydantic
 
-from pangloss_core_new.exceptions import PanglossConfigError
-from pangloss_core_new.model_setup.base_node_definitions import (
+from pangloss_core.exceptions import PanglossConfigError
+from pangloss_core.model_setup.base_node_definitions import (
     EditNodeBase,
     EmbeddedNodeBase,
 )
 
-from pangloss_core_new.model_setup.base_node_definitions import (
+from pangloss_core.model_setup.base_node_definitions import (
     AbstractBaseNode,
     BaseMixin,
     BaseNonHeritableMixin,
     ViewNodeBase,
 )
-from pangloss_core_new.model_setup.config_definitions import (
+from pangloss_core.model_setup.config_definitions import (
     EmbeddedConfig,
     _EmbeddedConfigInstantiated,
     _EmbeddedNodeDefinition,
@@ -31,11 +31,11 @@ from pangloss_core_new.model_setup.config_definitions import (
     _OutgoingReifiedRelationDefinition,
     RelationConfig,
 )
-from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
-from pangloss_core_new.model_setup.relation_properties_model import (
+from pangloss_core.model_setup.reference_node_base import BaseNodeReference
+from pangloss_core.model_setup.relation_properties_model import (
     RelationPropertiesModel,
 )
-from pangloss_core_new.model_setup.relation_to import (
+from pangloss_core.model_setup.relation_to import (
     ReifiedRelation,
     ReifiedTargetConfig,
 )

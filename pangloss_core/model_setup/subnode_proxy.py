@@ -3,10 +3,10 @@ from __future__ import annotations
 import typing
 
 
-from pangloss_core_new.model_setup.models_base import CamelModel
+from pangloss_core.model_setup.models_base import CamelModel
 
 if typing.TYPE_CHECKING:
-    from pangloss_core_new.model_setup.base_node_definitions import (
+    from pangloss_core.model_setup.base_node_definitions import (
         AbstractBaseNode,
         _EmbeddedNodeDefinition,
         _OutgoingRelationDefinition,

@@ -1,17 +1,17 @@
 import uuid
 
 import neo4j.exceptions
-from pangloss_core_new.model_setup.base_node_definitions import EditNodeBase
+from pangloss_core.model_setup.base_node_definitions import EditNodeBase
 
-from pangloss_core_new.model_setup.base_node_definitions import (
+from pangloss_core.model_setup.base_node_definitions import (
     AbstractBaseNode,
     ViewNodeBase,
 )
-from pangloss_core_new.model_setup.model_manager import ModelManager
-from pangloss_core_new.database import Transaction, write_transaction, read_transaction
-from pangloss_core_new.model_setup.reference_node_base import BaseNodeReference
-from pangloss_core_new.cypher_utils import cypher
-from pangloss_core_new.exceptions import PanglossNotFoundError, PanglossCreateError
+from pangloss_core.model_setup.model_manager import ModelManager
+from pangloss_core.database import Transaction, write_transaction, read_transaction
+from pangloss_core.model_setup.reference_node_base import BaseNodeReference
+from pangloss_core.cypher_utils import cypher
+from pangloss_core.exceptions import PanglossNotFoundError, PanglossCreateError
 
 
 class BaseNode(AbstractBaseNode):

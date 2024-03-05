@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "pangloss-core-new"
+name = "pangloss-core"
 version = "0.1.0"
 description = ""
 authors = ["Richard Hadden <richard.hadden@oeaw.ac.at>"]

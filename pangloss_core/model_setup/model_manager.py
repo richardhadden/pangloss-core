@@ -3,8 +3,8 @@ import typing
 
 import pydantic
 
-from pangloss_core_new.exceptions import PanglossConfigError
-from pangloss_core_new.model_setup.setup_utils import (
+from pangloss_core.exceptions import PanglossConfigError
+from pangloss_core.model_setup.setup_utils import (
     __pg_create_embedded_class__,
     __setup_delete_indirect_non_heritable_mixin_fields__,
     __setup_update_embedded_definitions__,
@@ -19,7 +19,7 @@ from pangloss_core_new.model_setup.setup_utils import (
 )
 
 if typing.TYPE_CHECKING:
-    from pangloss_core_new.model_setup.base_node_definitions import AbstractBaseNode
+    from pangloss_core.model_setup.base_node_definitions import AbstractBaseNode
 
 
 class ModelManager:
