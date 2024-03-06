@@ -154,7 +154,7 @@ class PetCat(Pet):
     pass
 ```
 
-(Here, Person can have pet of any `Pet` type)
+(Here, Person can have pet of any `Pet` type: `Pet`, `PetDog`, `PetCat`)
 
 Also, relations can take `typing.Union` types (for when hierarchy doesn't make sense):
 
@@ -167,7 +167,7 @@ class Brick(BaseNode): # yes people can have pet bricks oh yes
 
 class Person(BaseNode):
     has_pets: Annotated[
-                RelationTo[Pet | Brick], # relation to union of types
+                RelationTo[Pet | Brick], # <-- relation to union of types
                 RelationConfig(reverse_name="is_pet_of")]
 ```
 
@@ -198,7 +198,7 @@ class Pet(BaseNode):
 
 If you need to do more crazy things with relationships, relationships can be defined with `ReifiedRelation` models (converted to nodes), pointing to the target nodes using the `target` relation type (the reified relation model can then behave like anything else, and have other relations as well).
 
-e.g. here, we have some event, in which ONE person took part, but it's uncertain *which* person. 
+e.g. here, we have some event, in which ONE person took part, but it's uncertain *which* person, so we want to provide a list of possible persons with a certainty value for each
 
 ```python
 # Property adding a certain the Identification.target relation 
@@ -273,6 +273,9 @@ Setting the `RelationConfig` `create_inline`/`edit_inline` allows new objects to
 
 
 ## Notes
+
+## Code standards
+Hacky, horrible, and needs thorough revision. All the models are well-tested though. Just run `pytest`.
 
 ### Sneaky code generation
 
