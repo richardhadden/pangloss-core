@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import typing
 
-from pydantic import AnyHttpUrl, validator
-from pydantic_settings import BaseSettings as PydanticBaseSettings
+from pydantic import AnyHttpUrl, field_validator
+from pydantic_settings import BaseSettings as PydanticBaseSettings, SettingsConfigDict
 
 
 class BaseSettings(PydanticBaseSettings):
@@ -15,7 +15,7 @@ class BaseSettings(PydanticBaseSettings):
     DB_PASSWORD: str
     DB_DATABASE_NAME: str
 
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
+    @field_validator("BACKEND_CORS_ORIGINS")
     def assemble_cors_origins(
         cls, v: typing.Union[str, list[str]]
     ) -> typing.Union[list[str], str]:
@@ -25,16 +25,14 @@ class BaseSettings(PydanticBaseSettings):
             return v
         raise ValueError(v)
 
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
+    model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 
     def __init__(self, *args, **kwargs):
         # When initialising settings, copy it to this global var for access
         # within pangloss_core
         global SETTINGS
+
         SETTINGS = self
-        
         super().__init__(*args, **kwargs)
 
 

@@ -13,16 +13,6 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
-class Thing(BaseModel):
-    name: str
-
-
-class SomeOther(BaseModel):
-    age: int
-
-
-models = [Thing, SomeOther]
-
 
 def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
     api_router = APIRouter(prefix="/api")
@@ -84,6 +74,18 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                 methods={"get"},
                 name=f"{model.__name__}.Edit",
             )
+            
+            def _post_edit(model):
+                async def post_edit(uid: uuid.UUID, entity: model.Edit) -> model.Reference:
+                    try:
+                        result = await entity.write_edit()
+                    except PanglossNotFoundError:
+                        raise HTTPException(status_code=404, detail="Item not found")
+                    return result
+                return post_edit
+                
+            router.add_api_route("/edit/{uid}", endpoint=_post_edit(model), methods={"patch"}, name=f"{model.__name__}.Edit")
+                        
 
         api_router.include_router(router)
     _app.include_router(api_router)
