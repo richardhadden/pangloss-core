@@ -114,7 +114,7 @@ class Settings(BaseSettings):
 
 ### Basic models
 
-Models are declared using custom Pydantic syntax.
+Models are declared using Pydantic classes, with some custom classes built in (which are greatly modified on model instantiation).
 
 Models inherit from `pangloss_core.models.BaseNode`, e.g.:
 
