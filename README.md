@@ -110,6 +110,14 @@ class Settings(BaseSettings):
 
 - Fire up an instance of neo4j, with the APOC library installed (lazy? Run `sh neo4jdocker.sh`!)
 
+- Start the development server:
+
+```bash
+pangloss run <project-name>
+```
+
+(In development mode, autorestart will occur when any of the installed apps are modified.)
+
 ## Modelling
 
 ### Basic models
