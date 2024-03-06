@@ -20,7 +20,7 @@ Pangloss-Core
 #### General idea
 The point of this proof-of-concept is to allow easy(ish) creation of graph databases by defining models in Python, and having an API with FastAPI.
 
-The main design goal is to provide the API with an arbitrarily nested JSON object of related objects, and have it parsed into graph nodes and relations with a single request.
+The main design goal is to provide the API with an arbitrarily nested JSON object of related objects, and have it parsed into graph nodes and relations with a single request (and one database query).
 
 So you can take some models like this:
 
