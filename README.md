@@ -71,7 +71,7 @@ And end up with:
 
 Requires *Python 3.12*!
 
-Create a new folder with Poetry.
+- Create a new folder with Poetry.
 
  - Install `pangloss_core` from GitHub (for now):
 
