@@ -287,6 +287,10 @@ Some sneaky code generation is invoked to also create the following classes, whi
 - `BaseNode.Edit`: the type returned by API for editing, and sent back to save edit
 - `BaseNode.Embedded`: the type used when a node is embedded in another node (specifically: doesn't require label)
 
+### ORM (Object-Relational Mapper)
+
+There is no intention for this to function as an ORM. `BaseNode` models provide just basic CRUD methods which map to Cypher queries; except that it's hoped that the default CRUD operations return more useful things that just the models — a sort of splatted default-GraphQL-like view of a particular node and the relations from and to it (hence, directed relations at all times). The view taken here is that raw Cypher is the best way to write efficient queries to do very particular things — so define your own endpoints, write your own queries/response models [think of some canonical way to do this... should be added to model itself?]
+
 ### Migrations
 
 It's neo4j. So no. If you want to change something, write some Cypher. Maybe it'll be possible to introspect the models, find changes, and then generate the Cypher to do this — but as nothing really works at the moment, that is another matter.
