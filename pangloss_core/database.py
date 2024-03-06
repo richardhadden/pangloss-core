@@ -41,7 +41,9 @@ class Application:
 application = Application(uri=uri, user=auth[0], password=auth[1])
 
 
-def read_transaction[ModelType, ReturnType, **Params](
+def read_transaction[
+    ModelType, ReturnType, **Params
+](
     func: Callable[
         Concatenate[ModelType, neo4j.AsyncManagedTransaction, Params],
         Awaitable[ReturnType],
@@ -59,7 +61,9 @@ def read_transaction[ModelType, ReturnType, **Params](
     return wrapper
 
 
-def write_transaction[ModelType, ReturnType, **Params](
+def write_transaction[
+    ModelType, ReturnType, **Params
+](
     func: Callable[
         Concatenate[ModelType, neo4j.AsyncManagedTransaction, Params],
         Awaitable[ReturnType],

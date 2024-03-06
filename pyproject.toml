@@ -13,6 +13,9 @@ neo4j = "^5.17.0"
 fastapi = "^0.110.0"
 pydantic-settings = "^2.2.1"
 uvicorn = "^0.27.1"
+typer = "^0.9.0"
+rich = "^13.7.1"
+cookiecutter = "^2.6.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -22,3 +25,6 @@ pytest-asyncio = "^0.23.5"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+pangloss = 'pangloss_core.cli.main:cli'
