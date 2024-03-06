@@ -230,7 +230,7 @@ When viewing the "reverse" object of the relation (i.e. the `Person`), the reifi
 {
     "uid": "f394b67a-73a3-49fa-a12e-92dbf13b23d8", 
     "label": "John Smith",
-    "possibly_involved_in_event": [
+    "possiblyInvolvedInEvent": [
         {
             "uid": "0201b6db-0b4b-4a49-a212-b665fd8b0f43",
             "label": "Massive Party",
@@ -286,6 +286,8 @@ Some sneaky code generation is invoked to also create the following classes, whi
 - `BaseNode.Reference`: the type when a node is referenced by a relation from another node
 - `BaseNode.Edit`: the type returned by API for editing, and sent back to save edit
 - `BaseNode.Embedded`: the type used when a node is embedded in another node (specifically: doesn't require label)
+
+The models must be initialised, which is done by the `ModelManager` object (see `model_setup/model_manager.py`). Models do nothing on their own. (Should make sure a model is initialised before doing something with it, or throw an error). Initialising a model does lots of modification to the model, which means they basically do nothing (or do it wrong) until initialised (see the tests: all models must be initialised first). (See ORM below) The model are really there for type verification, and to drive the API. Not ORM.
 
 ### ORM (Object-Relational Mapper)
 
