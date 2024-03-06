@@ -130,6 +130,8 @@ class Thing(BaseNode):
 
 Models can also inherit, which assigns the label of both parent model and the actual model. All fields are inherited.
 
+Models can also be abstract. Add `__abstract__ = True` to the model. Any model in a hierarchy can be abstract. Abstract models can't be created — only subtypes of the abstract class. Abstract models can be the object of a relation (as long as it has some sub-types, otherwise it makes no sense!), and viewable as a list from the API.
+
 ### Relationships
 
 Relationships are *always* **always** directional, defined on the 'origin' class.
