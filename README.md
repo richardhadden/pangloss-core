@@ -274,8 +274,11 @@ Setting the `RelationConfig` `create_inline`/`edit_inline` allows new objects to
 
 ## Notes
 
-## Code standards
+### Code standards
 Hacky, horrible, and needs thorough revision. All the models are well-tested though. Just run `pytest`.
+
+### Testing
+The model setup and database interactions are all well tested with pytest. At the moment, running `pytest` will clear anything you have in the database. IDEA: add TEST_DB* info to the Settings, to allow a completely different database to be set for testing (as the standard edition of neo4j allows only one DB per instance, this will have to be fired up in a different Docker container)
 
 ### Sneaky code generation
 
@@ -299,7 +302,7 @@ It's neo4j. So no. If you want to change something, write some Cypher. Maybe it'
 
 ### User management
 
-Todo
+Todo. At the moment, no security at all. No log-in. Do not deploy anywhere.
 
 ### Interface
 To do. Big fan of `solid.js` though.
