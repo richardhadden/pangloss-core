@@ -20,8 +20,7 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
 
         def _list(model):
             async def list() -> typing.List[model.Reference]:  # type:ignore
-                return []
-
+                raise HTTPException(status_code=501, detail="Not implemented yet")
             return list
 
         router.add_api_route(
@@ -97,6 +96,14 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                 methods={"patch"},
                 name=f"{model.__name__}.Edit",
             )
+            
+            def _delete(model):
+                async def delete(uid: uuid.UUID) -> None:
+                    raise HTTPException(status_code=501, detail="Not implemented yet")
+                
+                return delete
+            
+            router.add_api_route("/{uid}", endpoint=_delete(model), methods={"delete"}, name=f"{model.__name__}.Delete")
 
         api_router.include_router(router)
     _app.include_router(api_router)
