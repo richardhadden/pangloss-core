@@ -79,7 +79,7 @@ Requires *Python 3.12*!
 poetry add git+https://github.com/richardhadden/pangloss-core.git
 ```
 
-- Create a new Pangloss Project ('Projects' contain database and other settings, and create the `app` object):
+- Create a new Pangloss Project ('Projects' contain database and other settings, and the installed apps, and the `app` object initialised by `uvicorn`):
 
 ```bash
 pangloss createproject <project-name>
