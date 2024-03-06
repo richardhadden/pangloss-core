@@ -106,17 +106,23 @@ class EmbeddedConfig:
 
 @dataclasses.dataclass
 class _EmbeddedConfigInstantiated:
-    embedded_node_base: type["AbstractBaseNode"] | type["BaseNonHeritableMixin"] | type[
-        "BaseMixin"
-    ] | type[types.UnionType]
+    embedded_node_base: (
+        type["AbstractBaseNode"]
+        | type["BaseNonHeritableMixin"]
+        | type["BaseMixin"]
+        | type[types.UnionType]
+    )
     validators: typing.Optional[typing.Sequence[annotated_types.BaseMetadata]] = None
 
 
 @dataclasses.dataclass
 class _EmbeddedNodeDefinition:
-    embedded_class: type["AbstractBaseNode"] | type["BaseNonHeritableMixin"] | type[
-        "BaseMixin"
-    ] | type[types.UnionType]
+    embedded_class: (
+        type["AbstractBaseNode"]
+        | type["BaseNonHeritableMixin"]
+        | type["BaseMixin"]
+        | type[types.UnionType]
+    )
     embedded_config: _EmbeddedConfigInstantiated
 
 

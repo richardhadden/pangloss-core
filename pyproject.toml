@@ -10,6 +10,9 @@ python = "^3.12"
 pydantic = "^2.6.1"
 pyhumps = "^3.8.0"
 neo4j = "^5.17.0"
+fastapi = "^0.110.0"
+pydantic-settings = "^2.2.1"
+uvicorn = "^0.27.1"
 
 
 [tool.poetry.group.dev.dependencies]

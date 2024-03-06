@@ -13,6 +13,10 @@ from pangloss_core.model_setup.reference_node_base import BaseNodeReference
 from pangloss_core.cypher_utils import cypher
 from pangloss_core.exceptions import PanglossNotFoundError, PanglossCreateError
 
+from pangloss_core.model_setup.relation_to import RelationTo
+from pangloss_core.model_setup.embedded import Embedded
+from pangloss_core.model_setup.config_definitions import EmbeddedConfig, RelationConfig
+
 
 class BaseNode(AbstractBaseNode):
     __abstract__ = True

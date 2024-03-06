@@ -20,10 +20,11 @@ from pangloss_core.model_setup.setup_utils import (
 
 if typing.TYPE_CHECKING:
     from pangloss_core.model_setup.base_node_definitions import AbstractBaseNode
+    from pangloss_core.models import BaseNode
 
 
 class ModelManager:
-    _registered_models: list[type["AbstractBaseNode"]] = []
+    _registered_models: list[type["BaseNode"]] = []
     # _edit_models_cache = {}
 
     def __init__(self, *args, **kwargs):

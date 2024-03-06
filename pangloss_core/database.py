@@ -14,10 +14,14 @@ from typing import (
 
 import neo4j
 
+from pangloss_core.settings import SETTINGS
 
-uri = "bolt://localhost:7687"
-auth = ("neo4j", "password")
-database = "neo4j"
+
+uri = SETTINGS.DB_URL  # "bolt://localhost:7687"
+auth = (SETTINGS.DB_USER, SETTINGS.DB_PASSWORD)
+# auth = ("neo4j", "password")
+database = SETTINGS.DB_DATABASE_NAME
+# database = "neo4j"
 
 
 # Define a transaction type, for short
@@ -37,7 +41,9 @@ class Application:
 application = Application(uri=uri, user=auth[0], password=auth[1])
 
 
-def read_transaction[ModelType, ReturnType, **Params](
+def read_transaction[
+    ModelType, ReturnType, **Params
+](
     func: Callable[
         Concatenate[ModelType, neo4j.AsyncManagedTransaction, Params],
         Awaitable[ReturnType],
@@ -46,16 +52,18 @@ def read_transaction[ModelType, ReturnType, **Params](
     async def wrapper(
         cls: ModelType, *args: Params.args, **kwargs: Params.kwargs
     ) -> ReturnType:
-        async with neo4j.AsyncGraphDatabase.driver(uri, auth=auth) as driver:
-            async with driver.session(database=database) as session:
-                bound_func = functools.partial(func, cls)
-                records = await session.execute_read(bound_func, *args, **kwargs)
-                return records
+        #async with neo4j.AsyncGraphDatabase.driver(uri, auth=auth) as driver:
+        async with application.driver.session(database=database) as session:
+            bound_func = functools.partial(func, cls)
+            records = await session.execute_read(bound_func, *args, **kwargs)
+            return records
 
     return wrapper
 
 
-def write_transaction[ModelType, ReturnType, **Params](
+def write_transaction[
+    ModelType, ReturnType, **Params
+](
     func: Callable[
         Concatenate[ModelType, neo4j.AsyncManagedTransaction, Params],
         Awaitable[ReturnType],

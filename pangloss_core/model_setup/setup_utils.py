@@ -62,10 +62,12 @@ def __setup_model_instantiates_abstract_trait__(
 
 
 def _get_concrete_node_classes(
-    classes: type[AbstractBaseNode]
-    | type[BaseNonHeritableMixin]
-    | type[BaseMixin]
-    | type[types.UnionType],
+    classes: (
+        type[AbstractBaseNode]
+        | type[BaseNonHeritableMixin]
+        | type[BaseMixin]
+        | type[types.UnionType]
+    ),
     include_subclasses: bool = False,
     include_abstract: bool = False,
 ) -> set[type[AbstractBaseNode]]:
@@ -207,10 +209,12 @@ def __setup_update_embedded_definitions__(cls: type[AbstractBaseNode]) -> None:
 
 
 def __pg_build_embedded_annotation_type__(
-    embedded_node_type: type[AbstractBaseNode]
-    | type[BaseNonHeritableMixin]
-    | type[BaseMixin]
-    | type[types.UnionType],
+    embedded_node_type: (
+        type[AbstractBaseNode]
+        | type[BaseNonHeritableMixin]
+        | type[BaseMixin]
+        | type[types.UnionType]
+    ),
     embedded_config: EmbeddedConfig | None,
     other_annotations: list[typing.Any],
 ) -> tuple[typing.Any, _EmbeddedConfigInstantiated]:
@@ -512,13 +516,13 @@ def __setup_update_reified_relation_annotations__(cls: type["AbstractBaseNode"])
             __setup_update_relation_annotations__(new_reification_model)
 
             ## TODO: HERE
-            new_reification_model.outgoing_relations[
-                "target"
-            ] = _OutgoingRelationDefinition(
-                target_base_class=target_class,
-                target_reference_class=target_class,
-                relation_config=instantiated_target_config,
-                origin_base_class=new_reification_model,
+            new_reification_model.outgoing_relations["target"] = (
+                _OutgoingRelationDefinition(
+                    target_base_class=target_class,
+                    target_reference_class=target_class,
+                    relation_config=instantiated_target_config,
+                    origin_base_class=new_reification_model,
+                )
             )
 
             __setup_update_embedded_definitions__(new_reification_model)
@@ -720,7 +724,7 @@ def __setup_construct_view_type__(cls: type[AbstractBaseNode]):
             incoming_related_types.append(incoming_relation.origin_reference_class)
         incoming_model_fields[incoming_relation_name] = (
             typing.Optional[list[typing.Union[*tuple(incoming_related_types)]]],  # type: ignore
-            None,
+            pydantic.Field(default=None, json_schema_extra={"incoming_relation": True}),
         )
 
     view_model = pydantic.create_model(
