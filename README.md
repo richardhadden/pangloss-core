@@ -301,7 +301,7 @@ Some sneaky code generation is invoked to also create the following classes, whi
 The models must be initialised, which is done by the `ModelManager` object (see `model_setup/model_manager.py`). Models do nothing on their own. (Should make sure a model is initialised before doing something with it, or throw an error). Initialising a model does lots of modification to the model, which means they basically do nothing (or do it wrong) until initialised (see the tests: all models must be initialised first). (See ORM below) The model are really there for type verification, and to drive the API. Not ORM.
 
 ### Of Camels and Cases (🐪 & 🧳)
-Model fields should be `snake_case`, as favoured by Python. These are automatically converted to and from `camelCase`, as favoured by JavaScriptLand.
+Model fields should be `snake_case`, as favoured by Python. These are automatically converted to and from `camelCase`, as favoured in JavaScriptLand.
 
 ### ORM (Object-Relational Mapper)
 

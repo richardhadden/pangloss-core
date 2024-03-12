@@ -1,5 +1,3 @@
-import pytest
-
 from pangloss_core.settings import BaseSettings
 
 from pydantic import AnyHttpUrl

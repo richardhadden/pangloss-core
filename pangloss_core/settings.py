@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import typing
 
-from pydantic import AnyHttpUrl, field_validator
+from pydantic import AnyHttpUrl, field_validator, AnyUrl
 from pydantic_settings import BaseSettings as PydanticBaseSettings, SettingsConfigDict
 
 
 class BaseSettings(PydanticBaseSettings):
     PROJECT_NAME: str
-    BACKEND_CORS_ORIGINS: list[AnyHttpUrl]
+    BACKEND_CORS_ORIGINS: list[typing.Any]
     INSTALLED_APPS: list[str]
     DB_URL: str
     DB_USER: str

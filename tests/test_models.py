@@ -20,6 +20,10 @@ from pangloss_core.model_setup.reference_node_base import BaseNodeReference
 from pangloss_core.model_setup.relation_properties_model import (
     RelationPropertiesModel,
 )
+from pangloss_core.model_setup.build_model_hierarchy import (
+    build_model_hierarchy,
+    build_model_subclass_lists,
+)
 from pangloss_core.model_setup.embedded import Embedded
 from pangloss_core.model_setup.model_manager import ModelManager
 from pangloss_core.model_setup.relation_to import (
@@ -1614,3 +1618,68 @@ def test_edit_model_has_embedded_nodes():
     assert john_smith_edit.outer[0].some_other_value == "SomeOtherValue"
     assert john_smith_edit.outer[0].inner[0].real_type == "inner"
     assert john_smith_edit.outer[0].inner[0].inner_has_pet[0].uid == inner_pet.uid
+
+
+def test_build_model_hierarchy():
+    class Entity(BaseNode):
+        pass
+
+    class Concept(BaseNode):
+        pass
+
+    class Animal(Entity):
+        pass
+
+    class Plant(Entity):
+        pass
+
+    class Dog(Animal):
+        pass
+
+    class Terrier(Dog):
+        pass
+
+    class Cat(Animal):
+        pass
+
+    ModelManager.initialise_models(depth=3)
+
+    assert build_model_hierarchy(BaseNode) == {
+        "Entity": {
+            "Animal": {
+                "Dog": {
+                    "Terrier": {},
+                },
+                "Cat": {},
+            },
+            "Plant": {},
+        },
+        "Concept": {},
+    }
+
+
+def test_build_model_subclass_lists():
+    class Entity(BaseNode):
+        pass
+
+    class Concept(BaseNode):
+        pass
+
+    class Animal(Entity):
+        pass
+
+    class Plant(Entity):
+        pass
+
+    class Dog(Animal):
+        pass
+
+    class Terrier(Dog):
+        pass
+
+    class Cat(Animal):
+        pass
+
+    ModelManager.initialise_models(depth=3)
+
+    assert build_model_subclass_lists() == {}

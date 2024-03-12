@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings
 
 from pangloss_core.model_setup.model_manager import ModelManager
 from pangloss_core.exceptions import PanglossNotFoundError
+from pangloss_core.models import BaseNode
 
 
 class ErrorResponse(BaseModel):
@@ -21,10 +22,15 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
         def _list(model):
             async def list() -> typing.List[model.Reference]:  # type:ignore
                 raise HTTPException(status_code=501, detail="Not implemented yet")
+
             return list
 
         router.add_api_route(
-            "/", endpoint=_list(model), methods={"get"}, name=f"{model.__name__}.List"
+            "/",
+            endpoint=_list(model),
+            methods={"get"},
+            name=f"{model.__name__}.List",
+            operation_id=f"{model.__name__}List",
         )
 
         if not model.__abstract__:
@@ -40,9 +46,12 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
 
                 return get
 
-            router.api_route("/{uid}", methods=["get"], name=f"{model.__name__}.View")(
-                _get(model)
-            )
+            router.api_route(
+                "/{uid}",
+                methods=["get"],
+                name=f"{model.__name__}.View",
+                operation_id=f"{model.__name__}View",
+            )(_get(model))
 
             def _create(model):
                 async def create(entity: model) -> model.Reference:  # type: ignore
@@ -51,9 +60,12 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
 
                 return create
 
-            router.api_route("/new", methods=["post"], name=f"{model.__name__}.Create")(
-                _create(model)
-            )
+            router.api_route(
+                "/new",
+                methods=["post"],
+                name=f"{model.__name__}.Create",
+                operation_id=f"{model.__name__}Create",
+            )(_create(model))
 
             def _get_edit(model):
                 async def get_edit(uid: uuid.UUID) -> model.Edit:  # type: ignore
@@ -70,7 +82,8 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                 "/edit",
                 endpoint=_get_edit(model),
                 methods={"get"},
-                name=f"{model.__name__}.Edit",
+                name=f"{model.__name__}.EditGet",
+                operation_id=f"{model.__name__}EditGet",
             )
 
             def _post_edit(model):
@@ -94,16 +107,22 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                 "/edit/{uid}",
                 endpoint=_post_edit(model),
                 methods={"patch"},
-                name=f"{model.__name__}.Edit",
+                name=f"{model.__name__}.EditPatch",
+                operation_id=f"{model.__name__}EditPatch",
             )
-            
+
             def _delete(model):
                 async def delete(uid: uuid.UUID) -> None:
                     raise HTTPException(status_code=501, detail="Not implemented yet")
-                
+
                 return delete
-            
-            router.add_api_route("/{uid}", endpoint=_delete(model), methods={"delete"}, name=f"{model.__name__}.Delete")
+
+            router.add_api_route(
+                "/{uid}",
+                endpoint=_delete(model),
+                methods={"delete"},
+                name=f"{model.__name__}.Delete",
+            )
 
         api_router.include_router(router)
     _app.include_router(api_router)

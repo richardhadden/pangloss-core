@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 import datetime
 import functools
+from rich import print
 
 import uuid
 from typing import (
@@ -28,17 +30,31 @@ database = SETTINGS.DB_DATABASE_NAME
 Transaction = neo4j.AsyncManagedTransaction
 
 
-class Application:
-    """Experiment: keep driver open for lifetime of app... good idea, but also, find way to use with tests"""
+""" class Application:
+    
 
     def __init__(self, uri, user, password):
         self.driver = neo4j.AsyncGraphDatabase.driver(uri, auth=(user, password))
 
-    async def close(self):
-        await self.driver.close()
+
+application = Application(
+    uri=SETTINGS.DB_URL, user=SETTINGS.DB_USER, password=SETTINGS.DB_PASSWORD
+)
 
 
-application = Application(uri=uri, user=auth[0], password=auth[1])
+@atexit.register
+def close_database_connection():
+    print("[yellow bold]Closing Database connection[/yellow bold]")
+
+    async def _close():
+        try:
+            await application.driver.close()
+        except Exception as e:
+            print("[red bold]Error closing database:[/red bold]", e)
+        else:
+            print("[green bold]Database connection closed[/green bold]")
+
+    asyncio.run(_close()) """
 
 
 def read_transaction[
