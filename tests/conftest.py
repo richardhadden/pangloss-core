@@ -1,3 +1,6 @@
+import pytest
+import asyncio
+
 from pangloss_core.settings import BaseSettings
 
 from pydantic import AnyHttpUrl
@@ -16,3 +19,14 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+@pytest.yield_fixture(scope="session")
+def event_loop(request):
+    """Create an instance of the default event loop for each test case."""
+    from pangloss_core.database import close_database_connection
+
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    close_database_connection()
+    loop.close()

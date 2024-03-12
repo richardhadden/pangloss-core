@@ -40,21 +40,28 @@ Transaction = neo4j.AsyncManagedTransaction
 application = Application(
     uri=SETTINGS.DB_URL, user=SETTINGS.DB_USER, password=SETTINGS.DB_PASSWORD
 )
+"""
 
 
 @atexit.register
 def close_database_connection():
-    print("[yellow bold]Closing Database connection[/yellow bold]")
+    print("[yellow bold]Closing Database connection...[/yellow bold]")
+    loop = asyncio.get_event_loop_policy().new_event_loop()
 
     async def _close():
         try:
-            await application.driver.close()
+            await driver.close()
         except Exception as e:
             print("[red bold]Error closing database:[/red bold]", e)
         else:
             print("[green bold]Database connection closed[/green bold]")
 
-    asyncio.run(_close()) """
+    loop.run_until_complete(_close())
+
+
+driver = neo4j.AsyncGraphDatabase.driver(
+    SETTINGS.DB_URL, auth=(SETTINGS.DB_USER, SETTINGS.DB_PASSWORD)
+)
 
 
 def read_transaction[
@@ -68,11 +75,11 @@ def read_transaction[
     async def wrapper(
         cls: ModelType, *args: Params.args, **kwargs: Params.kwargs
     ) -> ReturnType:
-        async with neo4j.AsyncGraphDatabase.driver(uri, auth=auth) as driver:
-            async with driver.session(database=database) as session:
-                bound_func = functools.partial(func, cls)
-                records = await session.execute_read(bound_func, *args, **kwargs)
-                return records
+        # async with neo4j.AsyncGraphDatabase.driver(uri, auth=auth) as driver:
+        async with driver.session(database=database) as session:
+            bound_func = functools.partial(func, cls)
+            records = await session.execute_read(bound_func, *args, **kwargs)
+            return records
 
     return wrapper
 
@@ -88,12 +95,12 @@ def write_transaction[
     async def wrapper(
         cls: ModelType, *args: Params.args, **kwargs: Params.kwargs
     ) -> ReturnType:
-        async with neo4j.AsyncGraphDatabase.driver(uri, auth=auth) as driver:
-            async with driver.session(database=database) as session:
-                bound_func = functools.partial(func, cls)
-                records = await session.execute_write(bound_func, *args, **kwargs)
+        # async with neo4j.AsyncGraphDatabase.driver(uri, auth=auth) as driver:
+        async with driver.session(database=database) as session:
+            bound_func = functools.partial(func, cls)
+            records = await session.execute_write(bound_func, *args, **kwargs)
 
-                return records
+            return records
 
     return wrapper
 

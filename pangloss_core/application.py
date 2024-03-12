@@ -1,8 +1,16 @@
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
 from pangloss_core.settings import BaseSettings
+
+
+async def thing():
+    while True:
+        await asyncio.sleep(2)
+        print("yowww")
 
 
 def get_application(settings: BaseSettings):
@@ -26,5 +34,7 @@ def get_application(settings: BaseSettings):
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    asyncio.create_task(thing())
 
     return _app
