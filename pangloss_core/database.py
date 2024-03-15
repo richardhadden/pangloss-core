@@ -17,6 +17,7 @@ from typing import (
 import neo4j
 
 from pangloss_core.settings import SETTINGS
+from pangloss_core.background_tasks import background_task_close
 
 
 uri = SETTINGS.DB_URL  # "bolt://localhost:7687"
@@ -30,38 +31,21 @@ database = SETTINGS.DB_DATABASE_NAME
 Transaction = neo4j.AsyncManagedTransaction
 
 
-""" class Application:
-    
-
-    def __init__(self, uri, user, password):
-        self.driver = neo4j.AsyncGraphDatabase.driver(uri, auth=(user, password))
-
-
-application = Application(
-    uri=SETTINGS.DB_URL, user=SETTINGS.DB_USER, password=SETTINGS.DB_PASSWORD
-)
-"""
-
-
-@atexit.register
-def close_database_connection():
-    print("[yellow bold]Closing Database connection...[/yellow bold]")
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-
-    async def _close():
-        try:
-            await driver.close()
-        except Exception as e:
-            print("[red bold]Error closing database:[/red bold]", e)
-        else:
-            print("[green bold]Database connection closed[/green bold]")
-
-    loop.run_until_complete(_close())
-
-
 driver = neo4j.AsyncGraphDatabase.driver(
     SETTINGS.DB_URL, auth=(SETTINGS.DB_USER, SETTINGS.DB_PASSWORD)
 )
+
+
+@background_task_close
+async def close_database_connection():
+    print("[yellow bold]Closing Database connection...[/yellow bold]")
+
+    try:
+        await driver.close()
+    except Exception as e:
+        print("[red bold]Error closing database:[/red bold]", e)
+    else:
+        print("[green bold]Database connection closed[/green bold]")
 
 
 def read_transaction[

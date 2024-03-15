@@ -19,7 +19,7 @@ def get_application(settings: BaseSettings):
 
     from pangloss_core.model_setup.model_manager import ModelManager
     from pangloss_core.api import setup_api_routes
-    from pangloss_core.background_tasks import BackgroundTaskRegistry
+    from pangloss_core.background_tasks import BackgroundTaskRegistry, BackgroundTaskCloseRegistry
     
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -27,16 +27,22 @@ def get_application(settings: BaseSettings):
         for task in BackgroundTaskRegistry:
             if not DEVELOPMENT_MODE or task["run_in_dev"]:
             
-                r = running_task = asyncio.create_task(task["function"]())
-                print("TASK",r)
+                running_task = asyncio.create_task(task["function"]())
+             
                 RunningBackgroundTasks.append(running_task)
             else:
                 logger.warning(f"Skipping background task '{task["name"]}' for development mode")
         yield
-        print("[yellow bold]Closing background tasks...[/yellow bold]")
+        
+            
+        for task in BackgroundTaskCloseRegistry:
+            await task()
+            
+        logging.info("Closing background tasks...")
         for task in RunningBackgroundTasks:
-            task.cancel()
-        print("[green bold]Background tasks closed[/green bold]")
+            task.cancel()    
+            
+        logging.info("Background tasks closed")
 
     for installed_app in settings.INSTALLED_APPS:
         __import__(f"{installed_app}.models")

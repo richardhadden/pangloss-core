@@ -37,7 +37,7 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
 
             def _get(model):
                 async def get(uid: uuid.UUID) -> model.View:  # type: ignore
-                    print("Getting", model, model.View, uid)
+
                     try:
                         result = await model.View.get(uid=uid)
                     except PanglossNotFoundError:
@@ -69,7 +69,7 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
 
             def _get_edit(model):
                 async def get_edit(uid: uuid.UUID) -> model.Edit:  # type: ignore
-                    print(uid)
+
                     try:
                         result = await model.Edit.get(uid=uid)
                     except PanglossNotFoundError:

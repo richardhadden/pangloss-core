@@ -20,6 +20,7 @@ class BackgroundTastRegistryItem(TypedDict):
 
 
 BackgroundTaskRegistry: list[BackgroundTastRegistryItem] = []
+BackgroundTaskCloseRegistry: list[Callable[[], Awaitable[None]]] = []
 
 
 P = ParamSpec("P")  # requires python >= 3.10
@@ -73,3 +74,11 @@ def background_task(
         return wraps(func)(func)
 
     return decorator
+
+
+def background_task_close(
+    func: Callable[[], Awaitable[None]]
+) -> Callable[[], Awaitable[None]]:
+    function = wraps(func)(func)
+    BackgroundTaskCloseRegistry.append(function)
+    return function

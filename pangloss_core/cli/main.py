@@ -148,5 +148,5 @@ def run(project_name: typing.Annotated[str, typer.Argument()]):
         subtitle_align="right",
     )
     print("\n\n", panel, "\n\n")
-    sc_command = ["uvicorn", f"{project_name}.main:app", "--reload", *reload_watch_list]
+    sc_command = ["uvicorn", f"{project_name}.main:app", "--lifespan", "on", "--reload", *reload_watch_list]
     subprocess.call(sc_command)
