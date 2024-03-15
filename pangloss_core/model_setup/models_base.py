@@ -28,7 +28,9 @@ class BaseNodeStandardFields(CamelModel):
     model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
 
     # Standard fields for all Reference types
-    uid: typing.Optional[uuid.UUID] = pydantic.Field(default_factory=uuid.uuid4)
+    uid: typing.Optional[uuid.UUID] = pydantic.Field(
+        default_factory=uuid.uuid4, json_schema_extra={"readOnly": True}
+    )
     label: typing.Annotated[str, annotated_types.MaxLen(500)]
 
     def __hash__(self):

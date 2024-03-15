@@ -9,6 +9,9 @@ from pangloss_core.model_setup.base_node_definitions import (
     EmbeddedNodeBase,
 )
 
+import pydantic
+
+
 
 if typing.TYPE_CHECKING:
     from pangloss_core.model_setup.base_node_definitions import (
@@ -40,6 +43,8 @@ def convert_type_for_writing(value):
     match value:
         case uuid.UUID():
             return str(value)
+        case pydantic.AnyUrl():
+            return str(value)
         case set():
             return list(value)
         case _:
@@ -48,20 +53,23 @@ def convert_type_for_writing(value):
 
 def unpack_properties_to_create_props_and_param_dict(
     node: AbstractBaseNode,
+    skip_fields: list[str] = [],
+    omit_braces: bool=False
 ) -> tuple[str, dict[str, Any]]:
     q_pairs = []
     params = {}
 
     for prop_name, field in node.property_fields.items():
-        try:
-            param_id = get_unique_string()
-            params[param_id] = convert_type_for_writing(getattr(node, prop_name))
-            q_pairs.append(f"""{prop_name}: ${param_id}""")
-        except AttributeError as e:
-            if isinstance(node, EmbeddedNodeBase) and prop_name == "label":
-                pass
-            else:
-                raise AttributeError(e)
+        if prop_name not in skip_fields:
+            try:
+                param_id = get_unique_string()
+                params[param_id] = convert_type_for_writing(getattr(node, prop_name))
+                q_pairs.append(f"""{prop_name}: ${param_id}""")
+            except AttributeError as e:
+                if isinstance(node, EmbeddedNodeBase) and prop_name == "label":
+                    pass
+                else:
+                    raise AttributeError(e)
 
     real_type_id = get_unique_string()
     params[real_type_id] = (
@@ -70,6 +78,8 @@ def unpack_properties_to_create_props_and_param_dict(
     q_pairs.append(f"""real_type: ${real_type_id}""")
     q_pairs.append("""created_when: datetime()""")
     q_pairs.append("""modified_when: datetime()""")
+    if omit_braces:
+        return ", ".join(q_pairs), params
     return "{" + ", ".join(q_pairs) + "}", params
 
 

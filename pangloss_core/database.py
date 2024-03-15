@@ -120,6 +120,17 @@ class Database:
         print(summary)
         return item
 
+    @classmethod
+    @write_transaction
+    async def cypher_write(cls, tx: Transaction, cypher_query: str, params: dict = {}):
+        result = await tx.run(
+            cypher_query,  # type: ignore
+            **params,
+        )
+        records = await result.values()
+
+        return records
+
     @write_transaction
     async def write(self, tx: Transaction):
         result = await tx.run(

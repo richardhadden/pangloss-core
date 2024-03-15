@@ -14,6 +14,7 @@ import asyncio
 
 
 class BackgroundTastRegistryItem(TypedDict):
+    name: str
     function: Callable[[], Awaitable[None]]
     run_in_dev: bool
 
@@ -52,14 +53,22 @@ def background_task(
         if not callable(func):
             raise TypeError("Not a callable. Did you use a non-keyword argument?")
         BackgroundTaskRegistry.append(
-            {"function": wraps(func)(func), "run_in_dev": run_in_dev}
+            {
+                "name": func.__name__,
+                "function": wraps(func)(func),
+                "run_in_dev": run_in_dev,
+            }
         )
         return wraps(func)(func)
 
     # With arguments, we need to return a function that accepts the function
     def decorator(func: Callable[[], Awaitable[None]]) -> Callable[[], Awaitable[None]]:
         BackgroundTaskRegistry.append(
-            {"function": wraps(func)(func), "run_in_dev": run_in_dev}
+            {
+                "name": func.__name__,
+                "function": wraps(func)(func),
+                "run_in_dev": run_in_dev,
+            }
         )
         return wraps(func)(func)
 

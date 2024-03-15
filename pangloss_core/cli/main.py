@@ -114,6 +114,7 @@ def startapp(name: str):
 
 @cli.command(help="Starts development server")
 def run(project_name: typing.Annotated[str, typer.Argument()]):
+    
     sys.path.append(os.getcwd())
 
     MODULE_PATH = os.path.join(os.getcwd(), project_name, "settings.py")
