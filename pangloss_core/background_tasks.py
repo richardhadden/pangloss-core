@@ -79,6 +79,8 @@ def background_task(
 def background_task_close(
     func: Callable[[], Awaitable[None]]
 ) -> Callable[[], Awaitable[None]]:
+    """Registers a function for closing down a background task."""
+
     function = wraps(func)(func)
     BackgroundTaskCloseRegistry.append(function)
     return function
