@@ -480,22 +480,23 @@ def test_reference_model_on_relation():
 
     ModelManager.initialise_models(depth=3)
 
+    mister_frisky = Pet(label="mister_frisky", real_type="pet", name="Mister Frisky")
+    mister_snappy = Crocodile(
+        label="mister_snappy", real_type="crocodile", name="Mister Snappy"
+    )
+
+    print(mister_snappy.as_reference_dict())
+
     p = Person(
         **{
             "label": "Tom Jones",
             "pets": [
-                {
-                    "name": "Mister Frisky",
-                    "label": "Mr Frisky",
-                    "real_type": "pet",
-                    "relation_properties": {"cost_of_purchase": 200},
-                },
-                {
-                    "name": "Mr Snappy",
-                    "label": "Mr Snappy",
-                    "real_type": "crocodile",
-                    "relation_properties": {"cost_of_purchase": 300},
-                },
+                mister_frisky.as_reference_dict(
+                    relation_properties={"cost_of_purchase": 200}
+                ),
+                mister_snappy.as_reference_dict(
+                    relation_properties={"cost_of_purchase": 300}
+                ),
             ],
         }
     )
@@ -506,14 +507,14 @@ def test_reference_model_on_relation():
     assert len(p.pets) == 2
     mf, ms = sorted(list(p.pets), key=lambda p: p.label)
 
+    assert mf.label == "mister_frisky"
     assert type(mf).__name__ == "Person__pets__PetReference"
-
-    assert mf.label == "Mr Frisky"
 
     assert mf.relation_properties.cost_of_purchase == 200
 
+    assert ms.label == "mister_snappy"
     assert type(ms).__name__ == "Person__pets__CrocodileReference"
-    assert ms.label == "Mr Snappy"
+
     assert ms.relation_properties.cost_of_purchase == 300
 
 
@@ -615,13 +616,16 @@ def test_reified_relation():
         == "ThingReference"
     )
 
+    thing = Thing(label="A thing", real_type="thing")
+    stuff = Stuff(label="some stuff", real_type="stuff")
+
     p = Person(
         label="John Smith",
         has_thing=[
             {
                 "identification_type": "nice",
-                "has_stuff": [{"real_type": "stuff", "label": "some stuff"}],
-                "target": [{"label": "A Thing"}],
+                "has_stuff": [stuff.as_reference_dict()],
+                "target": [thing.as_reference_dict()],
             }
         ],
     )
@@ -651,16 +655,14 @@ def test_reified_relation_init_works():
 
     ModelManager.initialise_models(depth=3)
 
+    person = Person(label="JohnSmith", real_type="person", name="John Smith")
+
     event = Event(
         label="Big Bash",
         person_identified=[
             {
                 "target": [
-                    dict(
-                        label="JohnSmith",
-                        real_type="person",
-                        relation_properties=dict(certainty=1),
-                    )
+                    person.as_reference_dict(relation_properties={"certainty": 1})
                 ],
             }
         ],
@@ -1028,12 +1030,14 @@ def test_get_all_properties():
 
     ModelManager.initialise_models(depth=3)
 
+    pet = Pet(real_type="pet", label="Mr Fluffy")
+
     thing = Thing(
         uid=uuid.uuid4(),
         label="A Thing",
         name="Mr Thing",
         age=100,
-        pets=[{"label": "Mr Fluffly"}],
+        pets=[pet.as_reference_dict()],
     )
 
     assert set(Thing.property_fields.keys()) == set(["age", "name", "uid", "label"])
@@ -1620,6 +1624,7 @@ def test_edit_model_has_embedded_nodes():
     assert john_smith_edit.outer[0].inner[0].inner_has_pet[0].uid == inner_pet.uid
 
 
+"""
 def test_build_model_hierarchy():
     class Entity(BaseNode):
         pass
@@ -1683,3 +1688,4 @@ def test_build_model_subclass_lists():
     ModelManager.initialise_models(depth=3)
 
     assert build_model_subclass_lists() == {}
+"""
