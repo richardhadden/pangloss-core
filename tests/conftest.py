@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "MyTestApp"
     BACKEND_CORS_ORIGINS: list[AnyHttpUrl] = []
 
-    DB_URL: str = "bolt://localhost:7687"
+    DB_URL: str = "bolt://localhost:7688"
     DB_USER: str = "neo4j"
     DB_PASSWORD: str = "password"
     DB_DATABASE_NAME: str = "neo4j"
@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-@pytest.yield_fixture(scope="session")
+@pytest.fixture(scope="session")
 def event_loop(request):
     """Create an instance of the default event loop for each test case."""
     from pangloss_core.database import close_database_connection
