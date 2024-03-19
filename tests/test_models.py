@@ -341,7 +341,7 @@ def test_instantiating_double_embedded():
 
     p = Parent(
         label="A Parent",
-        has_outer=[{"real_type": "outer", "has_inner": [{"real_type": "inner"}]}],
+        has_outer=[{"real_type": "Outer", "has_inner": [{"real_type": "Inner"}]}],
     )
 
     # Check things are instantiated with the right type
@@ -480,9 +480,9 @@ def test_reference_model_on_relation():
 
     ModelManager.initialise_models(depth=3)
 
-    mister_frisky = Pet(label="mister_frisky", real_type="pet", name="Mister Frisky")
+    mister_frisky = Pet(label="mister_frisky", real_type="Pet", name="Mister Frisky")
     mister_snappy = Crocodile(
-        label="mister_snappy", real_type="crocodile", name="Mister Snappy"
+        label="mister_snappy", real_type="Crocodile", name="Mister Snappy"
     )
 
     print(mister_snappy.as_reference_dict())
@@ -616,8 +616,8 @@ def test_reified_relation():
         == "ThingReference"
     )
 
-    thing = Thing(label="A thing", real_type="thing")
-    stuff = Stuff(label="some stuff", real_type="stuff")
+    thing = Thing(label="A thing", real_type="Thing")
+    stuff = Stuff(label="some stuff", real_type="Stuff")
 
     p = Person(
         label="John Smith",
@@ -655,7 +655,7 @@ def test_reified_relation_init_works():
 
     ModelManager.initialise_models(depth=3)
 
-    person = Person(label="JohnSmith", real_type="person", name="John Smith")
+    person = Person(label="JohnSmith", real_type="Person", name="John Smith")
 
     event = Event(
         label="Big Bash",
@@ -695,7 +695,7 @@ def test_self_referencing_model():
         label="the order",
         thing_ordered=[
             dict(
-                real_type="order",
+                real_type="Order",
                 label="order2",
                 uid=uuid.uuid4(),
             ),
@@ -1030,7 +1030,7 @@ def test_get_all_properties():
 
     ModelManager.initialise_models(depth=3)
 
-    pet = Pet(real_type="pet", label="Mr Fluffy")
+    pet = Pet(real_type="Pet", label="Mr Fluffy")
 
     thing = Thing(
         uid=uuid.uuid4(),
@@ -1082,7 +1082,7 @@ def test_initialisation_of_models_with_path_data_are_grouped_as_relation_propert
             {
                 "uid": uuid.uuid4(),
                 "label": "FluffyCat",
-                "real_type": "pet",
+                "real_type": "Pet",
                 "has_pet.purchased_when": "February",
             }
         ],
@@ -1113,7 +1113,7 @@ def test_contruct_view_type_basic():
         modified_when=neo4j.time.DateTime.utc_now(),
         label="Something",
         name="Something",
-        is_pet_of=[{"uid": uuid.uuid4(), "label": "John Smith", "real_type": "person"}],
+        is_pet_of=[{"uid": uuid.uuid4(), "label": "John Smith", "real_type": "Person"}],
     )
 
     # assert not hasattr(Person, "View")
@@ -1134,7 +1134,7 @@ def test_contruct_view_type_basic():
         modified_when=neo4j.time.DateTime.utc_now(),
         label="Something",
         name="Something",
-        is_pet_of=[{"uid": uuid.uuid4(), "label": "John Smith", "real_type": "person"}],
+        is_pet_of=[{"uid": uuid.uuid4(), "label": "John Smith", "real_type": "Person"}],
     )
 
     assert Pet.View.base_class is Pet
@@ -1260,14 +1260,14 @@ def test_embedded_model_does_not_need_label():
         outer=[
             {
                 "name": "OuterName",
-                "real_type": "outer",
+                "real_type": "Outer",
                 "inner": [
                     {
                         "name": "InnerName",
-                        "real_type": "inner",
+                        "real_type": "Inner",
                         "double_inner": [
                             {
-                                "real_type": "doubleinner",
+                                "real_type": "DoubleInner",
                                 "name": "DoubleInnerName",
                             }
                         ],
@@ -1301,7 +1301,7 @@ def test_types_of_embedded():
         label="A Person",
         date_of_birth=[
             DatePrecise.Embedded(
-                real_type="dateprecise", date_precise="Last February", uid=uuid.uuid4()
+                real_type="DatePrecise", date_precise="Last February", uid=uuid.uuid4()
             )
         ],
     )
@@ -1359,29 +1359,29 @@ def test_recursive_model():
     order = Order(
         label="John Smith orders Toby Jones to order Olive Branch to make a payment",
         carried_out_by=[
-            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "person"}
+            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "Person"}
         ],
         thing_ordered=[
             {
                 "label": "Toby Jones orders Olive Branch to make a payment",
-                "real_type": "order",
+                "real_type": "Order",
                 "carried_out_by": [
                     {
                         "uid": toby_jones.uid,
                         "label": toby_jones.label,
-                        "real_type": "person",
+                        "real_type": "Person",
                     }
                 ],
                 "thing_ordered": [
                     {
                         "label": "Olive Branch makes payment",
-                        "real_type": "payment",
+                        "real_type": "Payment",
                         "how_much": 1,
                         "payment_made_by": [
                             {
                                 "uid": olive_branch.uid,
                                 "label": olive_branch.label,
-                                "real_type": "person",
+                                "real_type": "Person",
                             }
                         ],
                     }
@@ -1398,31 +1398,31 @@ def test_recursive_model():
         uid=order.uid,
         label="John Smith orders Toby Jones to order Olive Branch to make a payment",
         carried_out_by=[
-            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "person"}
+            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "Person"}
         ],
         thing_ordered=[
             {
                 "uid": order.thing_ordered[0].uid,
                 "label": "Toby Jones orders Olive Branch to make a payment",
-                "real_type": "order",
+                "real_type": "Order",
                 "carried_out_by": [
                     {
                         "uid": toby_jones.uid,
                         "label": toby_jones.label,
-                        "real_type": "person",
+                        "real_type": "Person",
                     }
                 ],
                 "thing_ordered": [
                     {
                         "uid": order.thing_ordered[0].thing_ordered[0].uid,
                         "label": "Olive Branch makes payment",
-                        "real_type": "payment",
+                        "real_type": "Payment",
                         "how_much": 1,
                         "payment_made_by": [
                             {
                                 "uid": olive_branch.uid,
                                 "label": olive_branch.label,
-                                "real_type": "person",
+                                "real_type": "Person",
                             }
                         ],
                     }
@@ -1545,7 +1545,7 @@ def test_as_reference_dict():
     assert person.as_reference_dict() == {
         "uid": person.uid,
         "label": "John Smith",
-        "real_type": "person",
+        "real_type": "Person",
     }
 
     assert person.as_reference_dict(relation_properties={"likelihood": 1})
@@ -1553,7 +1553,7 @@ def test_as_reference_dict():
     assert person.as_reference_dict() == {
         "uid": person.uid,
         "label": "John Smith",
-        "real_type": "person",
+        "real_type": "Person",
     }
 
 
@@ -1602,12 +1602,12 @@ def test_edit_model_has_embedded_nodes():
         person_has_pet=[john_smith_pet.as_reference_dict()],
         outer=[
             {
-                "real_type": "outertypetwo",
+                "real_type": "OuterTypeTwo",
                 "some_other_value": "SomeOtherValue",
                 "outer_two_has_pet": [outer_two_pet.as_reference_dict()],
                 "inner": [
                     {
-                        "real_type": "inner",
+                        "real_type": "Inner",
                         "name": "InnerEmbedded",
                         "inner_has_pet": [inner_pet.as_reference_dict()],
                     }
@@ -1618,9 +1618,9 @@ def test_edit_model_has_embedded_nodes():
 
     assert john_smith_edit.person_has_pet
 
-    assert john_smith_edit.outer[0].real_type == "outertypetwo"
+    assert john_smith_edit.outer[0].real_type == "OuterTypeTwo"
     assert john_smith_edit.outer[0].some_other_value == "SomeOtherValue"
-    assert john_smith_edit.outer[0].inner[0].real_type == "inner"
+    assert john_smith_edit.outer[0].inner[0].real_type == "Inner"
     assert john_smith_edit.outer[0].inner[0].inner_has_pet[0].uid == inner_pet.uid
 
 

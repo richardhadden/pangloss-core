@@ -136,7 +136,7 @@ async def test_model_with_relations(clear_database):
         label="The Thing",
         name="The Thing",
         pets=[
-            {"uid": mister_fluffy.uid, "label": mister_fluffy.label, "real_type": "cat"}
+            {"uid": mister_fluffy.uid, "label": mister_fluffy.label, "real_type": "Cat"}
         ],
     )
 
@@ -150,7 +150,7 @@ async def test_model_with_relations(clear_database):
     assert result.uid == thing.uid
     assert result.pets[0].uid == mister_fluffy.uid
     assert result.pets[0].label == mister_fluffy.label
-    assert result.pets[0].real_type == "cat"
+    assert result.pets[0].real_type == "Cat"
 
 
 @pytest.mark.asyncio
@@ -189,7 +189,7 @@ async def test_model_with_relation_data():
             {
                 "uid": mister_fluffy.uid,
                 "label": mister_fluffy.label,
-                "real_type": "cat",
+                "real_type": "Cat",
                 "relation_properties": {"purchased_when": "February"},
             }
         ],
@@ -240,10 +240,10 @@ async def test_create_with_multiple_relations():
         label="John Smith",
         name="John Smith",
         pets=[
-            {"uid": cat.uid, "label": "Mister Fluffy", "real_type": "cat"},
-            {"uid": cat2.uid, "label": "Mrs Fluffy", "real_type": "cat"},
+            {"uid": cat.uid, "label": "Mister Fluffy", "real_type": "Cat"},
+            {"uid": cat2.uid, "label": "Mrs Fluffy", "real_type": "Cat"},
         ],
-        location=[{"uid": place.uid, "label": "France", "real_type": "place"}],
+        location=[{"uid": place.uid, "label": "France", "real_type": "Place"}],
     )
 
     await person.create()
@@ -256,7 +256,7 @@ async def test_create_with_multiple_relations():
     assert len(result.pets) == 2
     assert len(result.location) == 1
     pet1 = result.pets.pop()
-    assert pet1.real_type == "cat"
+    assert pet1.real_type == "Cat"
 
 
 @pytest.mark.asyncio
@@ -278,7 +278,7 @@ async def test_create_with_embedded_node():
 
     person = Person(
         label="A Person",
-        date_of_birth=[{"real_type": "dateprecise", "date_precise": "Last February"}],
+        date_of_birth=[{"real_type": "DatePrecise", "date_precise": "Last February"}],
     )
     print(Person.model_fields)
 
@@ -389,7 +389,7 @@ async def test_create_with_double_embedded_node_with_relation(clear_database):
             {
                 "label": person_pet.label,
                 "uid": person_pet.uid,
-                "real_type": "pet",
+                "real_type": "Pet",
             }
         ],
         outer=[
@@ -398,7 +398,7 @@ async def test_create_with_double_embedded_node_with_relation(clear_database):
                     {
                         "label": outer_pet.label,
                         "uid": outer_pet.uid,
-                        "real_type": "pet",
+                        "real_type": "Pet",
                     }
                 ],
                 "name": "OuterName",
@@ -412,7 +412,7 @@ async def test_create_with_double_embedded_node_with_relation(clear_database):
                                     {
                                         "label": double_inner_pet.label,
                                         "uid": double_inner_pet.uid,
-                                        "real_type": "pet",
+                                        "real_type": "Pet",
                                     }
                                 ],
                             }
@@ -492,7 +492,7 @@ async def test_write_abstract_reification():
                     {
                         "uid": person.uid,
                         "label": person.label,
-                        "real_type": "person",
+                        "real_type": "Person",
                         "relation_properties": {"certainty": 1},
                     }
                 ],
@@ -503,7 +503,7 @@ async def test_write_abstract_reification():
             {
                 "uid": tuesday.uid,
                 "label": tuesday.label,
-                "real_type": "day",
+                "real_type": "Day",
             },
         ],
     )
@@ -535,7 +535,7 @@ async def test_write_trait(clear_database):
     person = Person(
         label="John Smith",
         purchased_items=[
-            {"uid": pet.uid, "label": pet.label, "real_type": "pet"},
+            {"uid": pet.uid, "label": pet.label, "real_type": "Pet"},
         ],
     )
 
@@ -546,7 +546,7 @@ async def test_write_trait(clear_database):
     assert person_read
     purchased_item = person_read.purchased_items.pop()
     assert purchased_item.uid == pet.uid
-    assert purchased_item.real_type == "pet"
+    assert purchased_item.real_type == "Pet"
 
 
 @pytest.mark.asyncio
@@ -584,10 +584,10 @@ async def test_read_view():
         label="John Smith",
         name="John Smith",
         pets=[
-            {"uid": cat.uid, "label": "Mister Fluffy", "real_type": "cat"},
-            {"uid": cat2.uid, "label": "Mrs Fluffy", "real_type": "cat"},
+            {"uid": cat.uid, "label": "Mister Fluffy", "real_type": "Cat"},
+            {"uid": cat2.uid, "label": "Mrs Fluffy", "real_type": "Cat"},
         ],
-        location=[{"uid": place.uid, "label": "France", "real_type": "place"}],
+        location=[{"uid": place.uid, "label": "France", "real_type": "Place"}],
     )
 
     person_create_result = await person.create()
@@ -654,7 +654,7 @@ async def test_reverse_relations_through_embedded(clear_database):
                     {
                         "uid": cat.uid,
                         "label": cat.label,
-                        "real_type": "cat",
+                        "real_type": "Cat",
                     },
                 ],
                 "inner_thing": [
@@ -663,7 +663,7 @@ async def test_reverse_relations_through_embedded(clear_database):
                             {
                                 "uid": dog.uid,
                                 "label": dog.label,
-                                "real_type": "dog",
+                                "real_type": "Dog",
                             },
                         ],
                         "double_inner_thing": [
@@ -672,7 +672,7 @@ async def test_reverse_relations_through_embedded(clear_database):
                                     {
                                         "uid": tortoise.uid,
                                         "label": tortoise.label,
-                                        "real_type": "tortoise",
+                                        "real_type": "Tortoise",
                                     }
                                 ]
                             }
@@ -725,7 +725,7 @@ async def test_get_reverse_relation_through_reified(clear_database):
         pets=[
             {
                 "certainty": 1,
-                "target": [{"label": "Mr Fluffy", "real_type": "pet", "uid": pet.uid}],
+                "target": [{"label": "Mr Fluffy", "real_type": "Pet", "uid": pet.uid}],
             }
         ],
     )
@@ -760,13 +760,13 @@ async def test_reverse_relations_do_not_propagate_indefinitely(clear_database):
 
     pet = Pet(
         label="Mr Fluffy",
-        toys=[{"uid": toy.uid, "label": toy.label, "real_type": "toy"}],
+        toys=[{"uid": toy.uid, "label": toy.label, "real_type": "Toy"}],
     )
     await pet.create()
 
     person = Person(
         label="John Smith",
-        pets=[{"uid": pet.uid, "label": pet.label, "real_type": "pet"}],
+        pets=[{"uid": pet.uid, "label": pet.label, "real_type": "Pet"}],
     )
     await person.create()
 
@@ -809,9 +809,9 @@ async def test_create_relation_inline(clear_database):
                 "date": "February",
                 "cost": 1,
                 "person_carrying_out_activity": [
-                    {"label": person.label, "uid": person.uid, "real_type": "person"}
+                    {"label": person.label, "uid": person.uid, "real_type": "Person"}
                 ],
-                "real_type": "activity",
+                "real_type": "Activity",
             }
         ],
     )
@@ -898,9 +898,9 @@ async def test_edit_relation_inline(clear_database):
                 "date": "February",
                 "cost": 1,
                 "person_carrying_out_activity": [
-                    {"label": person.label, "uid": person.uid, "real_type": "person"}
+                    {"label": person.label, "uid": person.uid, "real_type": "Person"}
                 ],
-                "real_type": "activity",
+                "real_type": "Activity",
             }
         ],
     )
@@ -977,8 +977,8 @@ async def test_update_basic_relations():
     person = Person(
         label="John Smith",
         pets=[
-            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "pet"},
-            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "pet"},
+            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "Pet"},
+            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "Pet"},
         ],
     )
 
@@ -989,8 +989,8 @@ async def test_update_basic_relations():
         uid=person.uid,
         label="John Smith",
         pets=[
-            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "pet"},
-            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "pet"},
+            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "Pet"},
+            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "Pet"},
         ],
     )
 
@@ -1005,8 +1005,8 @@ async def test_update_basic_relations():
         uid=person.uid,
         label="John Smith",
         pets=[
-            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "pet"},
-            {"uid": snuffle.uid, "label": snuffle.label, "real_type": "pet"},
+            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "Pet"},
+            {"uid": snuffle.uid, "label": snuffle.label, "real_type": "Pet"},
         ],
     )
 
@@ -1021,10 +1021,10 @@ async def test_update_basic_relations():
         uid=person.uid,
         label="John Smith",
         pets=[
-            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "pet"},
-            {"uid": snuffle.uid, "label": snuffle.label, "real_type": "pet"},
-            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "pet"},
-            {"uid": truffle.uid, "label": truffle.label, "real_type": "pet"},
+            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "Pet"},
+            {"uid": snuffle.uid, "label": snuffle.label, "real_type": "Pet"},
+            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "Pet"},
+            {"uid": truffle.uid, "label": truffle.label, "real_type": "Pet"},
         ],
     )
 
@@ -1073,8 +1073,8 @@ async def test_update_inline_editable_relation(clear_database):
     person = Person(
         label="John Smith",
         pets=[
-            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "pet"},
-            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "pet"},
+            {"uid": fluffle.uid, "label": fluffle.label, "real_type": "Pet"},
+            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "Pet"},
         ],
     )
 
@@ -1085,8 +1085,8 @@ async def test_update_inline_editable_relation(clear_database):
         uid=person.uid,
         label="John Smith",
         pets=[
-            {"uid": fluffle.uid, "label": "Fluffle New Label", "real_type": "pet"},
-            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "pet"},
+            {"uid": fluffle.uid, "label": "Fluffle New Label", "real_type": "Pet"},
+            {"uid": wuffle.uid, "label": wuffle.label, "real_type": "Pet"},
         ],
     )
     await person_to_edit.write_edit()
@@ -1103,7 +1103,7 @@ async def test_update_inline_editable_relation(clear_database):
             {
                 "uid": fluffle.uid,
                 "label": "Fluffle Even Newer Label",
-                "real_type": "pet",
+                "real_type": "Pet",
             },
         ],
     )
@@ -1118,7 +1118,7 @@ async def test_update_inline_editable_relation(clear_database):
         uid=person.uid,
         label="John Smith",
         pets=[
-            {"uid": truffle.uid, "label": truffle.label, "real_type": "pet"},
+            {"uid": truffle.uid, "label": truffle.label, "real_type": "Pet"},
         ],
     )
 
@@ -1197,29 +1197,29 @@ async def test_update_double_embedded_objects():
     order = Order(
         label="John Smith orders Toby Jones to order Olive Branch to make a payment",
         carried_out_by=[
-            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "person"}
+            {"uid": john_smith.uid, "label": john_smith.label, "real_type": "Person"}
         ],
         thing_ordered=[
             {
                 "label": "Toby Jones orders Olive Branch to make a payment",
-                "real_type": "order",
+                "real_type": "Order",
                 "carried_out_by": [
                     {
                         "uid": toby_jones.uid,
                         "label": toby_jones.label,
-                        "real_type": "person",
+                        "real_type": "Person",
                     }
                 ],
                 "thing_ordered": [
                     {
                         "label": "Olive Branch makes payment",
-                        "real_type": "payment",
+                        "real_type": "Payment",
                         "how_much": 1,
                         "payment_made_by": [
                             {
                                 "uid": olive_branch.uid,
                                 "label": olive_branch.label,
-                                "real_type": "person",
+                                "real_type": "Person",
                             }
                         ],
                     }
@@ -1247,34 +1247,34 @@ async def test_update_double_embedded_objects():
         label="Bertie Wooster orders Toby Jones to order Olive Branch to make a payment",  # Update top level prop
         carried_out_by=[  # Update top level direct relation
             {
-                "real_type": "person",
+                "real_type": "Person",
                 "uid": bertie_wooster.uid,
                 "label": bertie_wooster.label,
             }
         ],
         thing_ordered=[
             {
-                "real_type": "order",
+                "real_type": "Order",
                 "uid": order.thing_ordered[0].uid,
                 "label": "Lucky Jim orders Olive Branch to make a payment UPDATED",  # Update second level prop
                 "carried_out_by": [
                     {
                         "uid": lucky_jim.uid,
                         "label": lucky_jim.label,
-                        "real_type": "person",
+                        "real_type": "Person",
                     }
                 ],
                 "thing_ordered": [
                     {
                         "uid": order.thing_ordered[0].thing_ordered[0].uid,
                         "label": "Olive Branch makes payment",
-                        "real_type": "payment",
+                        "real_type": "Payment",
                         "how_much": 1,
                         "payment_made_by": [
                             {
                                 "uid": olive_branch.uid,
                                 "label": olive_branch.label,
-                                "real_type": "person",
+                                "real_type": "Person",
                             }
                         ],
                     }
@@ -1284,7 +1284,7 @@ async def test_update_double_embedded_objects():
     )
 
     assert type(order_to_edit.thing_ordered[0].thing_ordered[0]) is Payment.Edit
-    assert order_to_edit.thing_ordered[0].thing_ordered[0].real_type == "payment"
+    assert order_to_edit.thing_ordered[0].thing_ordered[0].real_type == "Payment"
 
     start = time.perf_counter()
     await order_to_edit.write_edit()
@@ -1300,7 +1300,7 @@ async def test_update_double_embedded_objects():
 
     assert len(updated_order.thing_ordered) == 1
 
-    assert updated_order.thing_ordered[0].thing_ordered[0].real_type == "payment"
+    assert updated_order.thing_ordered[0].thing_ordered[0].real_type == "Payment"
 
     assert (
         updated_order.thing_ordered[0].label
@@ -1314,32 +1314,32 @@ async def test_update_double_embedded_objects():
         label="Bertie Wooster orders Lucky Jim to order Miss Marple to write a book",  # Update top level prop
         carried_out_by=[  # Update top level direct relation
             {
-                "real_type": "person",
+                "real_type": "Person",
                 "uid": bertie_wooster.uid,
                 "label": bertie_wooster.label,
             }
         ],
         thing_ordered=[
             {
-                "real_type": "order",
+                "real_type": "Order",
                 "uid": order.thing_ordered[0].uid,
                 "label": "Lucky Jim orders Miss Marple to write a book",  # Update second level prop
                 "carried_out_by": [
                     {
                         "uid": lucky_jim.uid,
                         "label": lucky_jim.label,
-                        "real_type": "person",
+                        "real_type": "Person",
                     }
                 ],
                 "thing_ordered": [
                     {
                         "label": "Miss Marple writes book",
-                        "real_type": "writingbook",
+                        "real_type": "WritingBook",
                         "written_by": [
                             {
                                 "uid": miss_marple.uid,
                                 "label": miss_marple.label,
-                                "real_type": "person",
+                                "real_type": "Person",
                             }
                         ],
                     }
@@ -1387,7 +1387,7 @@ async def test_update_double_embedded_objects():
         label="Bertie Wooster orders Olive Branch to make a payment",  # Update top level prop
         carried_out_by=[  # Update top level direct relation
             {
-                "real_type": "person",
+                "real_type": "Person",
                 "uid": bertie_wooster.uid,
                 "label": bertie_wooster.label,
             }
@@ -1395,13 +1395,13 @@ async def test_update_double_embedded_objects():
         thing_ordered=[
             {
                 "label": "Olive Branch makes payment",
-                "real_type": "payment",
+                "real_type": "Payment",
                 "how_much": 1,
                 "payment_made_by": [
                     {
                         "uid": olive_branch.uid,
                         "label": olive_branch.label,
-                        "real_type": "person",
+                        "real_type": "Person",
                     }
                 ],
             }
@@ -1417,7 +1417,7 @@ async def test_update_double_embedded_objects():
 
     assert len(updated_order.thing_ordered) == 1
     assert updated_order.label == "Bertie Wooster orders Olive Branch to make a payment"
-    assert updated_order.thing_ordered[0].real_type == "payment"
+    assert updated_order.thing_ordered[0].real_type == "Payment"
     assert updated_order.thing_ordered[0].uid == order_to_edit3.thing_ordered[0].uid
     assert updated_order.thing_ordered[0].label == "Olive Branch makes payment"
     assert updated_order.thing_ordered[0].payment_made_by[0].uid == olive_branch.uid
@@ -1481,12 +1481,12 @@ async def test_update_nested_embedded():
         person_has_pet=[john_smith_pet.as_reference_dict()],
         outer=[
             {
-                "real_type": "outertypeone",
+                "real_type": "OuterTypeOne",
                 "some_value": "SomeValue",
                 "outer_one_has_pet": [outer_one_pet.as_reference_dict()],
                 "inner": [
                     {
-                        "real_type": "inner",
+                        "real_type": "Inner",
                         "name": "InnerEmbedded",
                         "inner_has_pet": [inner_pet.as_reference_dict()],
                     }
@@ -1503,12 +1503,12 @@ async def test_update_nested_embedded():
         person_has_pet=[john_smith_pet.as_reference_dict()],
         outer=[
             {
-                "real_type": "outertypetwo",
+                "real_type": "OuterTypeTwo",
                 "some_other_value": "SomeValue",
                 "outer_two_has_pet": [outer_two_pet.as_reference_dict()],
                 "inner": [
                     {
-                        "real_type": "inner",
+                        "real_type": "Inner",
                         "name": "InnerEmbedded",
                         "inner_has_pet": [inner_pet.as_reference_dict()],
                     }
@@ -1523,7 +1523,7 @@ async def test_update_nested_embedded():
     assert john_smith_updated
     assert len(john_smith_updated.outer) == 1
 
-    assert john_smith_updated.outer[0].real_type == "outertypetwo"
+    assert john_smith_updated.outer[0].real_type == "OuterTypeTwo"
 
 
 @pytest.mark.asyncio
@@ -1576,12 +1576,12 @@ async def test_update_raises_error_and_does_nothing_if_uid_not_found():
         person_has_pet=[john_smith_pet.as_reference_dict()],
         outer=[
             {
-                "real_type": "outertypeone",
+                "real_type": "OuterTypeOne",
                 "some_value": "SomeValue",
                 "outer_one_has_pet": [outer_one_pet.as_reference_dict()],
                 "inner": [
                     {
-                        "real_type": "inner",
+                        "real_type": "Inner",
                         "name": "InnerEmbedded",
                         "inner_has_pet": [inner_pet.as_reference_dict()],
                     }
@@ -1597,12 +1597,12 @@ async def test_update_raises_error_and_does_nothing_if_uid_not_found():
         person_has_pet=[john_smith_pet.as_reference_dict()],
         outer=[
             {
-                "real_type": "outertypetwo",
+                "real_type": "OuterTypeTwo",
                 "some_other_value": "SomeValue",
                 "outer_two_has_pet": [outer_two_pet.as_reference_dict()],
                 "inner": [
                     {
-                        "real_type": "inner",
+                        "real_type": "Inner",
                         "name": "InnerEmbedded",
                         "inner_has_pet": [inner_pet.as_reference_dict()],
                     }

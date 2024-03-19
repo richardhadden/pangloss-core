@@ -121,7 +121,7 @@ def __pg_create_embedded_class__(cls: type[AbstractBaseNode]) -> type[EmbeddedNo
     embedded_class = pydantic.create_model(
         f"{cls.__name__}Embedded",
         __base__=EmbeddedNodeBase,
-        real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+        real_type=(typing.Literal[cls.__name__], cls.__name__),  # type: ignore
     )
     embedded_class.base_class = cls
     embedded_class.model_fields.update(parent_fields)
@@ -358,14 +358,14 @@ def __setup_initialise_reference_class__(cls):
             f"{cls.__name__}Reference",
             __base__=cls.Reference,
             base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
-            real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+            real_type=(typing.Literal[cls.__name__], cls.__name__),  # type: ignore
         )
     else:
         cls.Reference = pydantic.create_model(
             f"{cls.__name__}Reference",
             __base__=BaseNodeReference,
             base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
-            real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+            real_type=(typing.Literal[cls.__name__], cls.__name__),  # type: ignore
         )
 
 
@@ -390,7 +390,7 @@ def __setup_create_reference_class__(
             reference_model_name,
             __base__=BaseNodeReference,
             base_class=(typing.ClassVar[type["AbstractBaseNode"]], cls),
-            real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+            real_type=(typing.Literal[cls.__name__], cls.__name__),  # type: ignore
             relation_properties=(relation_properties_model, ...),
         )
 
@@ -737,7 +737,7 @@ def __setup_construct_view_type__(cls: type[AbstractBaseNode]):
             True,
         ),
         **incoming_model_fields,
-        real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+        real_type=(typing.Literal[cls.__name__], cls.__name__),  # type: ignore
         base_class=(typing.ClassVar[type[AbstractBaseNode]], cls),
     )
 
@@ -812,7 +812,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
                     relation.relation_config.validators,
                     relation.relation_config,
                 ],
-                pydantic.Field(default_factory=list, discriminator="real_type"),
+                pydantic.Field(default_factory=list, discriminator=""),
             )
 
         else:
@@ -828,7 +828,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
                     relation.relation_config.validators,
                     relation.relation_config,
                 ],
-                pydantic.Field(default_factory=list, discriminator="real_type"),
+                pydantic.Field(default_factory=list, discriminator=""),
             )
     embedded_new_defs = {}
 
@@ -855,7 +855,7 @@ def __setup_construct_edit_type__(cls: type[AbstractBaseNode]):
             typing.ClassVar[bool],
             True,
         ),
-        real_type=(typing.Literal[cls.__name__.lower()], cls.__name__.lower()),  # type: ignore
+        real_type=(typing.Literal[cls.__name__], cls.__name__),  # type: ignore
         base_class=(typing.ClassVar[AbstractBaseNode], cls),
         **outgoing_relation_new_defs,
         **embedded_new_defs,

@@ -72,9 +72,16 @@ def unpack_properties_to_create_props_and_param_dict(
                     raise AttributeError(e)
 
     real_type_id = get_unique_string()
-    params[real_type_id] = (
-        node.__class__.__name__.replace("Embedded", "").replace("Edit", "").lower()
-    )
+    
+   
+    if hasattr(node, "real_type"):
+        params[real_type_id] = (
+            node.real_type
+        )
+    else:
+        params[real_type_id] = node.__class__.__name__
+  
+        
     q_pairs.append(f"""real_type: ${real_type_id}""")
     q_pairs.append("""created_when: datetime()""")
     q_pairs.append("""modified_when: datetime()""")
@@ -350,7 +357,7 @@ def build_properties_update_dict(node: EditNodeBase):
         for prop_name, prop_value in dict(node).items()
         if prop_name in property_fields
     }
-    properties["real_type"] = node.base_class.__name__.lower()
+    properties["real_type"] = node.base_class.__name__
     return properties
 
 
@@ -534,25 +541,14 @@ def build_update_embedded_query_and_params(
 
         # update_relations_query +=
         update_relations_query += f"""\n
-        
-        
-        
         MERGE ({embedded_node_identifier}{query_labels} {{uid: ${embedded_node_uid_param}, real_type: ${embedded_node_real_type_param}}}) // {embedded_node.base_class.__name__}, {embedded_node.uid}
         ON CREATE
-       
             {target_update_set_query}
-            
         ON MATCH
             {target_update_set_query}
-        
         WITH {", ".join(accumulated_withs)} // <<
           {target_update_relations_query}
-        
-        
-        
         MERGE ({start_node_identifier})-[:{embedded_relation_name.upper()}]->({embedded_node_identifier})
-        
-
       WITH {", ".join(accumulated_withs)} // <<<<
         """
 
@@ -572,7 +568,7 @@ def build_update_embedded_query_and_params(
         
         WITH currently_related_item
         CALL {{
-                       WITH currently_related_item
+            WITH currently_related_item
             MATCH delete_path = (currently_related_item:DeleteDetach)(()-->(:DeleteDetach)){{0,}}(:DeleteDetach) 
             UNWIND nodes(delete_path) as x
            DETACH DELETE x 

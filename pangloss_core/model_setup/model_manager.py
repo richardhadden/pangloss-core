@@ -45,8 +45,8 @@ class ModelManager:
             # Adding real_type literal to the subclass; does not work on
             # subclassing (this way we bypass weird inheritance issues)
             subclass.model_fields["real_type"] = pydantic.fields.FieldInfo(
-                annotation=typing.Literal[subclass.__name__.lower()],
-                default=subclass.__name__.lower(),
+                annotation=typing.Literal[subclass.__name__],
+                default=subclass.__name__,
             )
 
             __setup_delete_indirect_non_heritable_mixin_fields__(subclass)
