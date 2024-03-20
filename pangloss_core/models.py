@@ -164,7 +164,7 @@ class BaseNode(AbstractBaseNode):
                         MATCH (node:{cls.__name__})
                         WITH collect(node) AS ns, COUNT (DISTINCT node) as total
                         UNWIND ns AS m
-                        RETURN m as matches, total as total_items ORDER BY m.label SKIP 10 LIMIT 10
+                        RETURN m as matches, total as total_items ORDER BY m.label SKIP $skip LIMIT $pageSize
                     }}
                     WITH COLLECT(matches{{.uid, .label, .citation, .real_type}}) AS matches_list, total_items
                     RETURN {{results: matches_list, count: total_items, page: $page, totalPages: toInteger(round((total_items*1.0)/$pageSize, 0, "UP"))}}

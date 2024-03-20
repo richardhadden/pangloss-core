@@ -37,10 +37,7 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                 pageSize: int = 10,
             ) -> ListResponse[model.Reference]:
 
-                try:
-                    result = await model.get_list(q=q, page=page, page_size=pageSize)
-                except PanglossNotFoundError as e:
-                    raise HTTPException(status_code=404, detail=e.message)
+                result = await model.get_list(q=q, page=page, page_size=pageSize)
 
                 result["next"] = (
                     str(
