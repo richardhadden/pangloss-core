@@ -1624,6 +1624,16 @@ def test_edit_model_has_embedded_nodes():
     assert john_smith_edit.outer[0].inner[0].inner_has_pet[0].uid == inner_pet.uid
 
 
+def test_models_can_set_own_ref_class():
+    class Thing:
+        name: str
+
+        class Reference(BaseNodeReference):
+            name: str
+
+    ModelManager.initialise_models(depth=3)
+
+
 """
 def test_build_model_hierarchy():
     class Entity(BaseNode):

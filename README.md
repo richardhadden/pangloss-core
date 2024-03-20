@@ -147,6 +147,8 @@ Relationships are *always* **always** directional, defined on the 'origin' class
 Relationships are defined using `Annotated[]` (from Typing module) types comprising, 1) `RelationTo[<RelatedClass>]`, and 2) a `RelationConfig` object, with minimally a `reverse_name` property defined.
 
 ```python
+from pangloss_core.models import BaseNode
+
 class Person(BaseNode):
     has_pets: Annotated[
                 RelationTo[Pet], 
@@ -167,6 +169,8 @@ class PetCat(Pet):
 Also, relations can take `typing.Union` types (for when hierarchy doesn't make sense):
 
 ```python
+from pangloss_core.models import BaseNode
+
 class Pet(BaseNode):
     name: str
 
@@ -183,6 +187,8 @@ class Person(BaseNode):
 Relations can have properties, by providing an additional model (included in the API as `relation_properties` on the related model), e.g.:
 
 ```python
+from pangloss_core.models import BaseNode
+
 class PersonHasPetsModel(RelationPropertiesModel):
     says_who: str
 
@@ -199,6 +205,20 @@ class Pet(BaseNode):
 ```
 
 `RelationModel` fields are limited to neo4j primitive values, though this isn't enforced at this moment (it just won't work).
+
+Relationships are set via the API using the `<BaseNode>.Reference` model (automatically generated), which by default contains only the `uid`, `label` and `real_type`. (`real_type` is a field to disambiguate types when either *could* be the object of a relation).
+
+The fields returned by the Reference model can be *augmented* (not overriden!) by supplying a nested `Reference` class on the `BaseNode` class, e.g.
+
+```python
+from pangloss_core.models import BaseNode, BaseNodeReference
+
+class Person(BaseNode):
+    name: str
+
+    class Reference(BaseNodeReference):
+        name: str   # <-- "name" field will also be returned with Person.Reference
+```
 
 ### Reified Relationships
 
