@@ -376,7 +376,7 @@ def __setup_create_reference_class__(
     relation_properties_model: type[RelationPropertiesModel] | None = None,
 ) -> type[BaseNodeReference]:
 
-    if not getattr(cls, "Reference", None) or not cls.Reference.base_class == cls:
+    if not getattr(cls, "Reference", None) or not getattr(cls.Reference, "base_class", None) == cls:
         __setup_initialise_reference_class__(cls)
 
     if not relation_properties_model:

@@ -20,8 +20,17 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
         router = APIRouter(prefix=f"/{model.__name__}", tags=[model.__name__])
 
         def _list(model):
-            async def list() -> typing.List[model.Reference]:  # type:ignore
-                raise HTTPException(status_code=501, detail="Not implemented yet")
+            class ResultsDict(typing.TypedDict):
+                results: typing.List[model.Reference]
+                page: int
+                count: int
+                totalPages: int
+
+            async def list(
+                q: typing.Optional[str] = "", page: int = 1, pageSize: int = 10
+            ) -> ResultsDict:  # type:ignore
+                result = await model.get_list(q=q, page=page, page_size=pageSize)
+                return result
 
             return list
 

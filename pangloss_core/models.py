@@ -1,3 +1,4 @@
+import typing
 import uuid
 
 import neo4j.exceptions
@@ -21,6 +22,8 @@ from pangloss_core.model_setup.relation_to import (
 from pangloss_core.model_setup.embedded import Embedded
 from pangloss_core.model_setup.config_definitions import EmbeddedConfig, RelationConfig
 from pangloss_core.model_setup.relation_properties_model import RelationPropertiesModel
+from pangloss_core.settings import SETTINGS
+
 
 class BaseNode(AbstractBaseNode):
     __abstract__ = True
@@ -124,3 +127,71 @@ class BaseNode(AbstractBaseNode):
             raise PanglossNotFoundError(
                 f'<{item.base_class.__name__} uid="{item.uid}"> not found'
             )
+
+    @classmethod
+    @read_transaction
+    async def get_list(
+        cls,
+        tx: Transaction,
+        q: typing.Optional[str],
+        page: int = 0,
+        page_size: int = 10,
+    ) -> list[BaseNodeReference]:
+        if q:
+            q = " ".join(f"/.*{token}.*/" for token in q.split(" "))
+
+            query = """
+        
+            
+            
+            CALL {
+                CALL db.index.fulltext.queryNodes("base_node_label_full_text", $q) YIELD node, score
+WITH collect(node) AS ns, COUNT (DISTINCT node) as total, score
+UNWIND ns AS m
+
+RETURN m as matches, total as total_items ORDER BY score SKIP $skip LIMIT $pageSize
+}
+WITH COLLECT(matches{.uid, .label, .citation}) AS matches_list, total_items
+RETURN {results: matches_list, count: total_items, page: $page, totalPages: toInteger(ceil(total_items/10))}
+
+           """
+
+            params = {
+                "skip": (page - 1) * page_size,
+                "pageSize": page_size,
+                "page": page,
+                "q": q,
+            }
+        else:
+            query = f"""MATCH (node:{cls.__name__}) RETURN node{{.label, .uid, .real_type,}} ORDER BY node.label SKIP $skip LIMIT $pageSize"""
+            params = {"skip": page * page_size, "pageSize": page_size}
+        print(query)
+        print(params)
+        result = await tx.run(query, params)
+        records = await result.value()
+        records[0]
+
+
+""" // GET LIST WITH COUNTS
+CALL {MATCH (n:ZoteroEntry)
+WITH collect(n) AS ns, COUNT (DISTINCT n) as total
+UNWIND ns AS m
+RETURN m as matches, total as total_items LIMIT 10
+}
+WITH COLLECT(matches{.uid, .label, .citation}) AS matches_list, total_items
+RETURN {matches: matches_list, total_items: total_items, page_number: 0, total_pages: toInteger(ceil(total_items/10))}
+
+
+"""
+
+
+""" 
+            
+            
+            
+            RETURN node{.label, .uid, .real_type, .citation}
+            ORDER BY score
+            SKIP $skip
+            LIMIT $pageSize
+        
+            """

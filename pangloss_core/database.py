@@ -32,7 +32,9 @@ Transaction = neo4j.AsyncManagedTransaction
 
 
 driver = neo4j.AsyncGraphDatabase.driver(
-    SETTINGS.DB_URL, auth=(SETTINGS.DB_USER, SETTINGS.DB_PASSWORD)
+    SETTINGS.DB_URL,
+    auth=(SETTINGS.DB_USER, SETTINGS.DB_PASSWORD),
+    keep_alive=True,
 )
 
 
