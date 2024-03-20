@@ -25,6 +25,10 @@ class BaseNodeStandardFields(CamelModel):
     """Class defining the standard fields for all Node models, Node reference models, etc."""
 
     __abstract__ = True
+    __create__ = True
+    __edit__ = True
+    __delete__ = True
+
     model_config = pydantic.ConfigDict(arbitrary_types_allowed=True)
 
     # Standard fields for all Reference types

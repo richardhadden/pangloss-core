@@ -13,6 +13,15 @@ class ErrorResponse(BaseModel):
     detail: str
 
 
+class ListResponse[T](typing.TypedDict):
+    results: typing.List[T]
+    page: int
+    count: int
+    totalPages: int
+    next: str | None
+    previous: str | None
+
+
 def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
 
     api_router = APIRouter(prefix="/api")
@@ -20,20 +29,13 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
         router = APIRouter(prefix=f"/{model.__name__}", tags=[model.__name__])
 
         def _list(model):
-            class ResultsDict(typing.TypedDict):
-                results: typing.List[model.Reference]
-                page: int
-                count: int
-                totalPages: int
-                next: str | None
-                previous: str | None
 
             async def list(
                 request: Request,
                 q: typing.Optional[str] = "",
                 page: int = 1,
                 pageSize: int = 10,
-            ) -> ResultsDict:
+            ) -> ListResponse[model.Reference]:
 
                 try:
                     result = await model.get_list(q=q, page=page, page_size=pageSize)
@@ -90,76 +92,88 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                 operation_id=f"{model.__name__}View",
             )(_get(model))
 
-            def _create(model):
-                async def create(entity: model) -> model.Reference:  # type: ignore
-                    result = await entity.create()
-                    return result
+            if model.__create__:
 
-                return create
+                def _create(model):
+                    async def create(entity: model) -> model.Reference:  # type: ignore
+                        result = await entity.create()
+                        return result
 
-            router.api_route(
-                "/new",
-                methods=["post"],
-                name=f"{model.__name__}.Create",
-                operation_id=f"{model.__name__}Create",
-            )(_create(model))
+                    return create
 
-            def _get_edit(model):
-                async def get_edit(uid: uuid.UUID) -> model.Edit:  # type: ignore
+                router.api_route(
+                    "/new",
+                    methods=["post"],
+                    name=f"{model.__name__}.Create",
+                    operation_id=f"{model.__name__}Create",
+                )(_create(model))
 
-                    try:
-                        result = await model.Edit.get(uid=uid)
-                    except PanglossNotFoundError:
-                        raise HTTPException(status_code=404, detail="Item not found")
-                    return result
+            if model.__edit__:
 
-                return get_edit
+                def _get_edit(model):
+                    async def get_edit(uid: uuid.UUID) -> model.Edit:  # type: ignore
 
-            router.add_api_route(
-                "/edit",
-                endpoint=_get_edit(model),
-                methods={"get"},
-                name=f"{model.__name__}.EditGet",
-                operation_id=f"{model.__name__}EditGet",
-            )
+                        try:
+                            result = await model.Edit.get(uid=uid)
+                        except PanglossNotFoundError:
+                            raise HTTPException(
+                                status_code=404, detail="Item not found"
+                            )
+                        return result
 
-            def _post_edit(model):
-                async def post_edit(
-                    uid: uuid.UUID, entity: model.Edit
-                ) -> model.Reference:
+                    return get_edit
 
-                    # Should not be using the endpoint to send different update objects!
-                    if entity.uid != uid:
-                        raise HTTPException(status_code=400, detail="Bad request")
+                router.add_api_route(
+                    "/edit",
+                    endpoint=_get_edit(model),
+                    methods={"get"},
+                    name=f"{model.__name__}.EditGet",
+                    operation_id=f"{model.__name__}EditGet",
+                )
 
-                    try:
-                        result = await entity.write_edit()
-                    except PanglossNotFoundError:
-                        raise HTTPException(status_code=404, detail="Item not found")
-                    return result
+                def _post_edit(model):
+                    async def post_edit(
+                        uid: uuid.UUID, entity: model.Edit
+                    ) -> model.Reference:
 
-                return post_edit
+                        # Should not be using the endpoint to send different update objects!
+                        if entity.uid != uid:
+                            raise HTTPException(status_code=400, detail="Bad request")
 
-            router.add_api_route(
-                "/edit/{uid}",
-                endpoint=_post_edit(model),
-                methods={"patch"},
-                name=f"{model.__name__}.EditPatch",
-                operation_id=f"{model.__name__}EditPatch",
-            )
+                        try:
+                            result = await entity.write_edit()
+                        except PanglossNotFoundError:
+                            raise HTTPException(
+                                status_code=404, detail="Item not found"
+                            )
+                        return result
 
-            def _delete(model):
-                async def delete(uid: uuid.UUID) -> None:
-                    raise HTTPException(status_code=501, detail="Not implemented yet")
+                    return post_edit
 
-                return delete
+                router.add_api_route(
+                    "/edit/{uid}",
+                    endpoint=_post_edit(model),
+                    methods={"patch"},
+                    name=f"{model.__name__}.EditPatch",
+                    operation_id=f"{model.__name__}EditPatch",
+                )
 
-            router.add_api_route(
-                "/{uid}",
-                endpoint=_delete(model),
-                methods={"delete"},
-                name=f"{model.__name__}.Delete",
-            )
+            if model.__delete__:
+
+                def _delete(model):
+                    async def delete(uid: uuid.UUID) -> None:
+                        raise HTTPException(
+                            status_code=501, detail="Not implemented yet"
+                        )
+
+                    return delete
+
+                router.add_api_route(
+                    "/{uid}",
+                    endpoint=_delete(model),
+                    methods={"delete"},
+                    name=f"{model.__name__}.Delete",
+                )
 
         api_router.include_router(router)
     _app.include_router(api_router)

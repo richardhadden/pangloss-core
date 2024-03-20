@@ -158,6 +158,7 @@ class BaseNode(AbstractBaseNode):
                 "page": page,
                 "q": search_string,
             }
+
         else:
             query = f"""CALL {{
                         MATCH (node:{cls.__name__})
@@ -176,9 +177,9 @@ class BaseNode(AbstractBaseNode):
 
         result = await tx.run(query, params)  # type: ignore
         records = await result.value()
+        print(records)
         try:
+
             return records[0]
         except IndexError:
-            raise PanglossNotFoundError(
-                f"Page {page} is beyond the number of pages for this query"
-            )
+            return {"results": [], "count": 0, "page": page, "totalPages": 0}
