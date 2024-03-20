@@ -138,60 +138,47 @@ class BaseNode(AbstractBaseNode):
         page_size: int = 10,
     ) -> list[BaseNodeReference]:
         if q:
-            q = " ".join(f"/.*{token}.*/" for token in q.split(" "))
+            search_string = " ".join(f"/.*{token}.*/" for token in q.split(" "))
 
-            query = """
-        
-            
-            
-            CALL {
-                CALL db.index.fulltext.queryNodes("base_node_label_full_text", $q) YIELD node, score
-WITH collect(node) AS ns, COUNT (DISTINCT node) as total, score
-UNWIND ns AS m
+            query = """            
+                CALL {
+                    CALL db.index.fulltext.queryNodes("base_node_label_full_text", $q) YIELD node, score
+                    WITH collect(node) AS ns, COUNT(DISTINCT node) as total, score
+                    UNWIND ns AS m
 
-RETURN m as matches, total as total_items ORDER BY score SKIP $skip LIMIT $pageSize
-}
-WITH COLLECT(matches{.uid, .label, .citation}) AS matches_list, total_items
-RETURN {results: matches_list, count: total_items, page: $page, totalPages: toInteger(ceil(total_items/10))}
-
-           """
+                    RETURN m as matches, total as total_items ORDER BY score SKIP $skip LIMIT $pageSize
+                }
+                WITH COLLECT(matches{.uid, .label, .citation, .real_type}) AS matches_list, total_items
+                RETURN {results: matches_list, count: total_items, page: $page, totalPages: toInteger(round((total_items*1.0)/$pageSize, 0, "UP"))}
+            """
 
             params = {
                 "skip": (page - 1) * page_size,
                 "pageSize": page_size,
                 "page": page,
-                "q": q,
+                "q": search_string,
             }
         else:
-            query = f"""MATCH (node:{cls.__name__}) RETURN node{{.label, .uid, .real_type,}} ORDER BY node.label SKIP $skip LIMIT $pageSize"""
-            params = {"skip": page * page_size, "pageSize": page_size}
-        print(query)
-        print(params)
-        result = await tx.run(query, params)
+            query = f"""CALL {{
+                        MATCH (node:{cls.__name__})
+                        WITH collect(node) AS ns, COUNT (DISTINCT node) as total
+                        UNWIND ns AS m
+                        RETURN m as matches, total as total_items ORDER BY m.label SKIP 10 LIMIT 10
+                    }}
+                    WITH COLLECT(matches{{.uid, .label, .citation, .real_type}}) AS matches_list, total_items
+                    RETURN {{results: matches_list, count: total_items, page: $page, totalPages: toInteger(round((total_items*1.0)/$pageSize, 0, "UP"))}}
+                """
+            params = {
+                "skip": (page - 1) * page_size,
+                "pageSize": page_size,
+                "page": page,
+            }
+
+        result = await tx.run(query, params)  # type: ignore
         records = await result.value()
-        records[0]
-
-
-""" // GET LIST WITH COUNTS
-CALL {MATCH (n:ZoteroEntry)
-WITH collect(n) AS ns, COUNT (DISTINCT n) as total
-UNWIND ns AS m
-RETURN m as matches, total as total_items LIMIT 10
-}
-WITH COLLECT(matches{.uid, .label, .citation}) AS matches_list, total_items
-RETURN {matches: matches_list, total_items: total_items, page_number: 0, total_pages: toInteger(ceil(total_items/10))}
-
-
-"""
-
-
-""" 
-            
-            
-            
-            RETURN node{.label, .uid, .real_type, .citation}
-            ORDER BY score
-            SKIP $skip
-            LIMIT $pageSize
-        
-            """
+        try:
+            return records[0]
+        except IndexError:
+            raise PanglossNotFoundError(
+                f"Page {page} is beyond the number of pages for this query"
+            )

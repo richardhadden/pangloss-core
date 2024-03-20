@@ -1,13 +1,12 @@
 import typing
 import uuid
 
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 
 from pangloss_core.model_setup.model_manager import ModelManager
 from pangloss_core.exceptions import PanglossNotFoundError
-from pangloss_core.models import BaseNode
 
 
 class ErrorResponse(BaseModel):
@@ -15,6 +14,7 @@ class ErrorResponse(BaseModel):
 
 
 def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
+
     api_router = APIRouter(prefix="/api")
     for model in ModelManager._registered_models:
         router = APIRouter(prefix=f"/{model.__name__}", tags=[model.__name__])
@@ -25,11 +25,39 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                 page: int
                 count: int
                 totalPages: int
+                next: str | None
+                previous: str | None
 
             async def list(
-                q: typing.Optional[str] = "", page: int = 1, pageSize: int = 10
-            ) -> ResultsDict:  # type:ignore
-                result = await model.get_list(q=q, page=page, page_size=pageSize)
+                request: Request,
+                q: typing.Optional[str] = "",
+                page: int = 1,
+                pageSize: int = 10,
+            ) -> ResultsDict:
+
+                try:
+                    result = await model.get_list(q=q, page=page, page_size=pageSize)
+                except PanglossNotFoundError as e:
+                    raise HTTPException(status_code=404, detail=e.message)
+
+                result["next"] = (
+                    str(
+                        request.url.replace_query_params(
+                            q=q, page=page + 1, pageSize=pageSize
+                        )
+                    )
+                    if page + 1 <= result["totalPages"]
+                    else None
+                )
+                result["previous"] = (
+                    str(
+                        request.url.replace_query_params(
+                            q=q, page=page - 1, pageSize=pageSize
+                        )
+                    )
+                    if page - 1 >= 1
+                    else None
+                )
                 return result
 
             return list
