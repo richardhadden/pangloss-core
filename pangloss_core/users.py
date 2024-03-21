@@ -1,4 +1,6 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Annotated, Optional
 
 
@@ -21,10 +23,18 @@ from fastapi.openapi.models import (
 )
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
+from pydantic import BaseModel, Field, validate_email, SecretStr
+from pydantic_core import PydanticCustomError
+from rich import print
+import typer
 
-from pydantic import BaseModel, Field
 
 from pangloss_core.database import read_transaction, write_transaction, Transaction
+from pangloss_core.initialisation import (
+    initialise_pangloss_application,
+    get_project_settings,
+)
+
 
 # to get a string like this run:
 # openssl rand -hex 32
@@ -99,7 +109,7 @@ class UserInDB(User):
         query = """
         CREATE (user:User)
         SET user = $user
-        RETURN user.email
+        RETURN user.username
         """
         params = {"user": dict(self)}
         result = await tx.run(query, params)
@@ -254,3 +264,62 @@ def setup_user_routes(_app: FastAPI, settings):
     _app.include_router(api_router)
 
     return _app
+
+
+user_cli = typer.Typer(name="users")
+
+
+def get_email():
+    try:
+        email = validate_email(typer.prompt("Email", type=str))
+        return email
+    except PydanticCustomError:
+        print("[red bold]Invalid email[/red bold]")
+        return get_email()
+
+
+async def create_user(username: str, email: str, password: str, admin: bool):
+    user_to_create = UserInDB(
+        username=username,
+        email=email,
+        hashed_password=get_password_hash(password.encode("utf-8")).decode("utf-8"),
+        admin=admin,
+    )
+    result = await user_to_create.write_user()
+    return result
+
+
+@user_cli.command(help="Add new user")
+def create(
+    project: Annotated[
+        Path, typer.Option(exists=True, help="The path of the project to run")
+    ]
+):
+    initialise_pangloss_application(get_project_settings(str(project)))
+
+    print("[green bold]Creating a new user[/green bold]")
+    username = typer.prompt("Username", type=str)
+
+    _, email = get_email()
+
+    password = str(
+        typer.prompt(
+            "Password",
+            type=SecretStr,
+            confirmation_prompt="Repeat password to confirm",
+            hide_input=True,
+        )
+    )
+
+    admin = typer.confirm("Make admin?")
+
+    username = asyncio.run(
+        create_user(
+            username=username,
+            email=email,
+            password=password,
+            admin=admin,
+        )
+    )
+
+    print(f"\n[green bold]Done! Created user '{username}'[/green bold]")

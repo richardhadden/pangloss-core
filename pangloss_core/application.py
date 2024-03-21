@@ -17,7 +17,7 @@ RunningBackgroundTasks = []
 
 
 def get_application(settings: BaseSettings):
-    DEVELOPMENT_MODE = "--reload" in sys.argv
+    DEVELOPMENT_MODE = "--reload" in sys.argv # Dumb hack!
 
     from pangloss_core.model_setup.model_manager import ModelManager
     from pangloss_core.api import setup_api_routes

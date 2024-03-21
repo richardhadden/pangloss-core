@@ -1,30 +1,38 @@
-import importlib.util
+
 import subprocess
 import typing
 import os
-import sys
+from pathlib import Path
+
 
 from cookiecutter.exceptions import OutputDirExistsException
 from cookiecutter.main import cookiecutter
 from rich import print
 from rich.panel import Panel
-from rich.syntax import Syntax
 
 
 import typer
 
-from pangloss_core.exceptions import PanglossCLIError
+from pangloss_core.initialisation import get_project_settings, get_app_clis
+from pangloss_core.users import user_cli
 
-cli = typer.Typer(
+
+TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "templates")
+
+cli_app = typer.Typer(
     add_completion=False,
     help="Pangloss CLI",
     name="Pangloss CLI",
 )
 
-TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "templates")
+cli_app.add_typer(user_cli, name="users")
 
-
-@cli.command(help="Create new project")
+@cli_app.command()
+def registercli(project: typing.Annotated[Path, typer.Option(exists=True, help="The path of the project to run")]):
+    print(project)
+    
+    
+@cli_app.command(help="Create new project")
 def createapp(app_name: typing.Annotated[str, typer.Argument()]):
     context = {"folder_name": app_name}
     try:
@@ -45,14 +53,6 @@ def createapp(app_name: typing.Annotated[str, typer.Argument()]):
             "\n",
         )
     else:
-        my_code = f"""
-class Settings(BaseSettings):
-    PROJECT_NAME: str = "MyApp"
-    
-    ...
-
-    INSTALLED_APPS: list[str] = ["pangloss_core", "{context["folder_name"]}"] # <-- Add 
-"""
 
         print(
             "\n",
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
         )
 
 
-@cli.command(help="Create new project")
+@cli_app.command(help="Create new project")
 def createproject(project_name: typing.Annotated[str, typer.Argument()]):
     context = {"folder_name": project_name}
     try:
@@ -107,32 +107,21 @@ def createproject(project_name: typing.Annotated[str, typer.Argument()]):
         )
 
 
-@cli.command(help="Does Nothing")
+@cli_app.command(help="Does Nothing")
 def startapp(name: str):
     print("[green]Hello world![/green]")
 
 
-@cli.command(help="Starts development server")
-def run(project_name: typing.Annotated[str, typer.Argument()]):
+
+Project = typing.Annotated[Path, typer.Option(exists=True, help="The path of the project to run")]
+
+@cli_app.command(help="Starts development server")
+def run(project: Project):
     
-    sys.path.append(os.getcwd())
-
-    MODULE_PATH = os.path.join(os.getcwd(), project_name, "settings.py")
-    MODULE_NAME = project_name
-    spec = importlib.util.spec_from_file_location(MODULE_NAME, MODULE_PATH)
-
-    if spec and spec.loader:
-        try:
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[spec.name] = module
-            spec.loader.exec_module(module)
-            p = importlib.import_module(project_name, package="SETTINGS")
-        except FileNotFoundError:
-            raise PanglossCLIError(
-                f'Project "{project_name}" not found in current directory: "{os.getcwd()}"'
-            )
-    reload_watch_list = ["--reload-dir", os.path.join(os.getcwd(), project_name)]
-    for installed_app in p.settings.INSTALLED_APPS:
+    
+    settings = get_project_settings(str(project))        
+    reload_watch_list = ["--reload-dir", project]
+    for installed_app in settings.INSTALLED_APPS:
         m = __import__(installed_app)
 
         reload_watch_list.append("--reload-dir")
@@ -140,13 +129,30 @@ def run(project_name: typing.Annotated[str, typer.Argument()]):
 
     panel = Panel(
         (
-            f"Autoreloading on!\n\n   Watching project: [bold green]{project_name}[/bold green]\n   "
-            f"Watching installed apps: {", ".join(f"[bold blue]{a}[/bold blue]" for a in p.settings.INSTALLED_APPS)}"
+            f"Autoreloading on!\n\n   Watching project: [bold green]{str(project)}[/bold green]\n   "
+            f"Watching installed apps: {", ".join(f"[bold blue]{a}[/bold blue]" for a in settings.INSTALLED_APPS)}"
         ),
         title="📜 Starting Pangloss development server!",
         subtitle="(tally ho!)",
         subtitle_align="right",
     )
     print("\n\n", panel, "\n\n")
-    sc_command = ["uvicorn", f"{project_name}.main:app", "--lifespan", "on", "--reload", *reload_watch_list]
+    sc_command = ["uvicorn", f"{str(project)}.main:app", "--lifespan", "on", "--reload", *reload_watch_list]
     subprocess.call(sc_command)
+
+
+
+
+def cli():
+    """Initialises the Typer-based CLI by checking installed app folders
+    for a cli.py file and finding Typer apps inside."""
+    import sys
+    if "--project" in sys.argv:
+        project_path = sys.argv[sys.argv.index("--project") + 1]
+        settings = get_project_settings(project_path)
+        for app in settings.INSTALLED_APPS:
+            cli_apps = get_app_clis(app)
+            for c_app in cli_apps:
+                cli_app.add_typer(c_app, name=c_app.info.name)
+    
+    return cli_app()
