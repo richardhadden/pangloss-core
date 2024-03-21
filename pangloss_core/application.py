@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from rich import print
 
 from pangloss_core.settings import BaseSettings
+from pangloss_core.users import setup_user_routes
+from pangloss_core.database import initialise_database_driver
 
 logger = logging.getLogger("uvicorn.info")
 RunningBackgroundTasks = []
@@ -50,13 +52,14 @@ def get_application(settings: BaseSettings):
         __import__(installed_app)
 
     ModelManager.initialise_models(depth=3)
-
+    initialise_database_driver(settings)
     _app = FastAPI(
         title=settings.PROJECT_NAME,
         swagger_ui_parameters={"defaultModelExpandDepth": 1, "deepLinking": True},
         lifespan=lifespan
     )
     _app = setup_api_routes(_app, settings)
+    _app = setup_user_routes(_app, settings)
     _app.add_middleware(
         CORSMiddleware,
         allow_origins=[str(origin) for origin in ["*"]],

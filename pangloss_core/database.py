@@ -16,26 +16,35 @@ from typing import (
 
 import neo4j
 
-from pangloss_core.settings import SETTINGS
+
 from pangloss_core.background_tasks import background_task_close
-
-
-uri = SETTINGS.DB_URL  # "bolt://localhost:7687"
-auth = (SETTINGS.DB_USER, SETTINGS.DB_PASSWORD)
-# auth = ("neo4j", "password")
-database = SETTINGS.DB_DATABASE_NAME
-# database = "neo4j"
 
 
 # Define a transaction type, for short
 Transaction = neo4j.AsyncManagedTransaction
 
 
-driver = neo4j.AsyncGraphDatabase.driver(
-    SETTINGS.DB_URL,
-    auth=(SETTINGS.DB_USER, SETTINGS.DB_PASSWORD),
-    keep_alive=True,
-)
+driver: neo4j.AsyncDriver
+
+uri: str
+auth: tuple[str, str]
+database: str
+
+
+def initialise_database_driver(SETTINGS):
+    global driver, uri, auth, database
+    # from pangloss_core.settings import SETTINGS
+
+    uri = SETTINGS.DB_URL  # "bolt://localhost:7687"
+    auth = (SETTINGS.DB_USER, SETTINGS.DB_PASSWORD)
+    # auth = ("neo4j", "password")
+    database = SETTINGS.DB_DATABASE_NAME
+    # database = "neo4j"
+    driver = neo4j.AsyncGraphDatabase.driver(
+        SETTINGS.DB_URL,
+        auth=(SETTINGS.DB_USER, SETTINGS.DB_PASSWORD),
+        keep_alive=True,
+    )
 
 
 @background_task_close

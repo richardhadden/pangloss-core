@@ -15,6 +15,8 @@ class BaseSettings(PydanticBaseSettings):
     DB_PASSWORD: str
     DB_DATABASE_NAME: str
 
+    authjwt_secret_key: str
+
     @field_validator("BACKEND_CORS_ORIGINS")
     def assemble_cors_origins(
         cls, v: typing.Union[str, list[str]]

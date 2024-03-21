@@ -177,7 +177,7 @@ class BaseNode(AbstractBaseNode):
 
         result = await tx.run(query, params)  # type: ignore
         records = await result.value()
-        print(records)
+
         try:
 
             return records[0]

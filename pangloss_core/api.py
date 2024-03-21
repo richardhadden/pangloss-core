@@ -1,12 +1,13 @@
 import typing
 import uuid
 
-from fastapi import FastAPI, APIRouter, HTTPException, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 
 from pangloss_core.model_setup.model_manager import ModelManager
 from pangloss_core.exceptions import PanglossNotFoundError
+from pangloss_core.users import User, get_current_active_user
 
 
 class ErrorResponse(BaseModel):
@@ -32,6 +33,7 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
 
             async def list(
                 request: Request,
+                current_user: typing.Annotated[User, Depends(get_current_active_user)],
                 q: typing.Optional[str] = "",
                 page: int = 1,
                 pageSize: int = 10,

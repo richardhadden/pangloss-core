@@ -1,6 +1,7 @@
 import pytest
 import asyncio
 
+from pangloss_core.database import initialise_database_driver
 from pangloss_core.settings import BaseSettings
 
 from pydantic import AnyHttpUrl
@@ -16,9 +17,12 @@ class Settings(BaseSettings):
     DB_DATABASE_NAME: str = "neo4j"
 
     INSTALLED_APPS: list[str] = ["pangloss_core"]
+    authjwt_secret_key: str = "SECRET"
 
 
 settings = Settings()
+
+initialise_database_driver(settings)
 
 
 @pytest.fixture(scope="session")
