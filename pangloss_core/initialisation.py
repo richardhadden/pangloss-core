@@ -20,7 +20,7 @@ def import_project_file_of_name(folder_name: str, file_name: str):
             module = importlib.util.module_from_spec(spec)
             sys.modules[spec.name] = module
             spec.loader.exec_module(module)
-            p = importlib.import_module(folder_name, package=file_name)
+            p = importlib.import_module(folder_name, package=folder_name)
         except FileNotFoundError:
             return None
         return p

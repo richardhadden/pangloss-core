@@ -13,8 +13,11 @@ from rich.panel import Panel
 
 import typer
 
-from pangloss_core.initialisation import get_project_settings, get_app_clis
+from pangloss_core.initialisation import get_project_settings, get_app_clis, import_project_file_of_name
+from pangloss_core.model_setup.model_manager import ModelManager
 from pangloss_core.users import user_cli
+from pangloss_core.indexes import install_indexes_and_constraints
+from pangloss_core.database import initialise_database_driver
 
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "templates")
@@ -108,7 +111,7 @@ def createproject(project_name: typing.Annotated[str, typer.Argument()]):
 
 
 @cli_app.command(help="Does Nothing")
-def startapp(name: str):
+def start_app(name: str):
     print("[green]Hello world![/green]")
 
 
@@ -117,8 +120,6 @@ Project = typing.Annotated[Path, typer.Option(exists=True, help="The path of the
 
 @cli_app.command(help="Starts development server")
 def run(project: Project):
-    
-    
     settings = get_project_settings(str(project))        
     reload_watch_list = ["--reload-dir", project]
     for installed_app in settings.INSTALLED_APPS:
@@ -140,19 +141,30 @@ def run(project: Project):
     sc_command = ["uvicorn", f"{str(project)}.main:app", "--lifespan", "on", "--reload", *reload_watch_list]
     subprocess.call(sc_command)
 
-
+@cli_app.command()
+def setup_database(project: Project):
+    install_indexes_and_constraints()
+    
 
 
 def cli():
     """Initialises the Typer-based CLI by checking installed app folders
     for a cli.py file and finding Typer apps inside."""
-    import sys
+    import sys  
+   
     if "--project" in sys.argv:
         project_path = sys.argv[sys.argv.index("--project") + 1]
         settings = get_project_settings(project_path)
+        initialise_database_driver(settings)
         for app in settings.INSTALLED_APPS:
-            cli_apps = get_app_clis(app)
-            for c_app in cli_apps:
-                cli_app.add_typer(c_app, name=c_app.info.name)
-    
+            __import__(f"{app}.models")
+            try:
+                m = __import__(f"{app}.cli")
+                c = m.cli.__dict__.get("cli")
+                if c:
+                    cli_app.add_typer(c, name=c.info.name)
+            except ModuleNotFoundError:
+                pass
+            
+    ModelManager.initialise_models(depth=3)
     return cli_app()

@@ -22,7 +22,6 @@ from pangloss_core.model_setup.relation_to import (
 from pangloss_core.model_setup.embedded import Embedded
 from pangloss_core.model_setup.config_definitions import EmbeddedConfig, RelationConfig
 from pangloss_core.model_setup.relation_properties_model import RelationPropertiesModel
-from pangloss_core.settings import SETTINGS
 
 
 class BaseNode(AbstractBaseNode):
@@ -140,16 +139,17 @@ class BaseNode(AbstractBaseNode):
         if q:
             search_string = " ".join(f"/.*{token}.*/" for token in q.split(" "))
 
-            query = """            
-                CALL {
-                    CALL db.index.fulltext.queryNodes("base_node_label_full_text", $q) YIELD node, score
+            query = f"""            
+                CALL {{
+                    CALL db.index.fulltext.queryNodes("{cls.__name__}FullTextIndex", $q) YIELD node, score
+
                     WITH collect(node) AS ns, COUNT(DISTINCT node) as total, score
                     UNWIND ns AS m
 
-                    RETURN m as matches, total as total_items ORDER BY score SKIP $skip LIMIT $pageSize
-                }
-                WITH COLLECT(matches{.uid, .label, .citation, .real_type}) AS matches_list, total_items
-                RETURN {results: matches_list, count: total_items, page: $page, totalPages: toInteger(round((total_items*1.0)/$pageSize, 0, "UP"))}
+                    RETURN m as matches, total as total_items ORDER BY -score SKIP $skip LIMIT $pageSize
+                }}
+                WITH COLLECT(matches{{.uid, .label, .citation, .real_type}}) AS matches_list, total_items
+                RETURN {{results: matches_list, count: total_items, page: $page, totalPages: toInteger(round((total_items*1.0)/$pageSize, 0, "UP"))}}
             """
 
             params = {

@@ -123,7 +123,6 @@ class Database:
             **params,
         )
         records = await result.values()
-
         return records
 
     @write_transaction
@@ -133,8 +132,6 @@ class Database:
             uid=str(test_uid),
         )
         records = await result.values()
-
-        print(records)
         return
 
     @classmethod
