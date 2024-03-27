@@ -4,3 +4,5 @@ __pycache__/
 
 *.cypher
 .mypy_cache
+
+.DS_Store
