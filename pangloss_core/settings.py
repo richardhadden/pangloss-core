@@ -15,6 +15,9 @@ class BaseSettings(PydanticBaseSettings):
     DB_PASSWORD: str
     DB_DATABASE_NAME: str
 
+    INTERFACE_LANGUAGES: list[str]
+    DEFAULT_INTERFACE_LANGUAGE: str = "en"
+
     authjwt_secret_key: str
 
     @field_validator("BACKEND_CORS_ORIGINS")

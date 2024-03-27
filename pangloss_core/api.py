@@ -36,7 +36,7 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                 current_user: typing.Annotated[User, Depends(get_current_active_user)],
                 q: typing.Optional[str] = "",
                 page: int = 1,
-                pageSize: int = 10,
+                pageSize: int = 25,
             ) -> ListResponse[model.Reference]:
 
                 result = await model.get_list(q=q, page=page, page_size=pageSize)
@@ -59,6 +59,7 @@ def setup_api_routes(_app: FastAPI, settings: BaseSettings) -> FastAPI:
                     if page - 1 >= 1
                     else None
                 )
+                # print(result)
                 return result
 
             return list

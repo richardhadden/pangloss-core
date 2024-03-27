@@ -1,3 +1,4 @@
+import re
 import typing
 import uuid
 
@@ -137,7 +138,9 @@ class BaseNode(AbstractBaseNode):
         page_size: int = 10,
     ) -> list[BaseNodeReference]:
         if q:
-            search_string = " ".join(f"/.*{token}.*/" for token in q.split(" "))
+            terms = q.split(" ")
+
+            search_string = " AND ".join(f"/.*{re.escape(term)}.*/" for term in terms)
 
             query = f"""            
                 CALL {{
@@ -146,7 +149,7 @@ class BaseNode(AbstractBaseNode):
                     WITH collect(node) AS ns, COUNT(DISTINCT node) as total, score
                     UNWIND ns AS m
 
-                    RETURN m as matches, total as total_items ORDER BY -score SKIP $skip LIMIT $pageSize
+                    RETURN m as matches, total as total_items ORDER BY score SKIP $skip LIMIT $pageSize
                 }}
                 WITH COLLECT(matches{{.uid, .label, .citation, .real_type}}) AS matches_list, total_items
                 RETURN {{results: matches_list, count: total_items, page: $page, totalPages: toInteger(round((total_items*1.0)/$pageSize, 0, "UP"))}}

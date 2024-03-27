@@ -97,6 +97,12 @@ class User(BaseModel):
     disabled: bool = Field(default=False, json_schema_extra={"readOnly": True})
 
 
+class UserView(BaseModel):
+    username: str
+    email: str
+    full_name: str | None
+
+
 class UserCreate(User):
     password: str
 
@@ -168,6 +174,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -175,6 +182,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
         username: str | None = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -193,6 +201,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
 async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)]
 ):
+
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
@@ -210,7 +219,7 @@ def setup_user_routes(_app: FastAPI, settings):
 
     api_router = APIRouter(prefix="/users", tags=["User"])
 
-    @api_router.post("/login", response_model=Token)
+    @api_router.post("/login", response_model=Token, name="UserLogin")
     async def login_for_access_token(
         response: Response, form_data: OAuth2PasswordRequestForm = Depends()
     ):  # added response as a function parameter
@@ -225,14 +234,20 @@ def setup_user_routes(_app: FastAPI, settings):
             data={"sub": user.username}, expires_delta=access_token_expires
         )
         response.set_cookie(
-            key="access_token", value=f"Bearer {access_token}", httponly=True
+            key="access_token", value=f"Bearer {access_token}", httponly=False
         )  # set HttpOnly cookie in response
         return {"access_token": access_token, "token_type": "bearer"}
 
-    @api_router.get("/logout")
+    @api_router.get("/logout", name="UserLogout")
     async def log_out(response: Response) -> dict[str, str]:
         response.delete_cookie("access_token")
         return {"message": "Logged out"}
+
+    @api_router.get("/current_user", name="CurrentUser")
+    async def current_user(
+        current_user: Annotated[User, Depends(get_current_active_user)]
+    ) -> UserView:
+        return UserView(**dict(current_user))
 
     @api_router.get("/me", response_model=User)
     async def read_users_me(
@@ -246,7 +261,7 @@ def setup_user_routes(_app: FastAPI, settings):
     ):
         return [{"item_id": "Foo", "owner": current_user.username}]
 
-    @api_router.post("/new")
+    @api_router.post("/new", name="CreateUser")
     async def create_user(
         new_user: UserCreate,
         current_user: Annotated[User, Depends(get_current_admin_user)],

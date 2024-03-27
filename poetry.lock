@@ -675,6 +675,17 @@ build-docs = ["cloud-sptheme (>=1.10.1)", "sphinx (>=1.6)", "sphinxcontrib-fullt
 totp = ["cryptography"]
 
 [[package]]
+name = "patchdiff"
+version = "0.3.4"
+description = "MIT"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "patchdiff-0.3.4-py3-none-any.whl", hash = "sha256:109710036e028aa0bac10139997a42b7d69d73d0275eff12455a59f2d6f8f995"},
+    {file = "patchdiff-0.3.4.tar.gz", hash = "sha256:034959a4a6e4143b2f63ae645b221e0617909410ffb3e186b77c643225e233e6"},
+]
+
+[[package]]
 name = "pluggy"
 version = "1.4.0"
 description = "plugin and hook calling mechanisms for python"
@@ -688,6 +699,17 @@ files = [
 [package.extras]
 dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
+
+[[package]]
+name = "pluralizer"
+version = "1.2.0"
+description = "Singularize or pluralize a given word useing a pre-defined list of rules"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "pluralizer-1.2.0-py3-none-any.whl", hash = "sha256:d8f92ffa787661d9e704d1e0d8abc6c6c4bbaae9e790d7c709707eafbe17ed12"},
+    {file = "pluralizer-1.2.0.tar.gz", hash = "sha256:fe3fb8e1e53fabf372e77d8cbebe04b0f8fc7db853aeff50095dbd5628ac39c5"},
+]
 
 [[package]]
 name = "pyasn1"
@@ -1320,4 +1342,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "9986bec8b649235bb5e7e74f9128fc1b4b517e8becdbdf099dbcf7c94efb5162"
+content-hash = "02b08c4cbad9733e1f402525bfc8e1c1282cbc78a50c6f94f052b70b3ef70c6a"

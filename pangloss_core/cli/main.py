@@ -18,7 +18,7 @@ from pangloss_core.model_setup.model_manager import ModelManager
 from pangloss_core.users import user_cli
 from pangloss_core.indexes import install_indexes_and_constraints
 from pangloss_core.database import initialise_database_driver
-
+from pangloss_core.translation import build_or_patch_translation_file
 
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "templates")
 
@@ -145,7 +145,10 @@ def run(project: Project):
 def setup_database(project: Project):
     install_indexes_and_constraints()
     
-
+@cli_app.command()
+def create_translation_file(project: Project):
+    settings = get_project_settings(str(project))
+    build_or_patch_translation_file(project, settings)
 
 def cli():
     """Initialises the Typer-based CLI by checking installed app folders

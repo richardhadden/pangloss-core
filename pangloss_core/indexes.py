@@ -55,14 +55,24 @@ def install_indexes_and_constraints():
     queries = [
         "CREATE CONSTRAINT BaseNodeUidUnique IF NOT EXISTS FOR (n:BaseNode) REQUIRE n.uid IS UNIQUE",
     ]
+    print("Creating Constraint: [green bold]BaseNode[/green bold].[blue bold]uid[/blue bold] must be unique")
+    
     for model in ModelManager._registered_models:
         string_fields = get_string_fields(model)
         string_fields_query = ", ".join(
             f"n.{field_name}" for field_name in string_fields
         )
         queries.extend(
-            [
-                f"CREATE FULLTEXT INDEX {model.__name__}FullTextIndex IF NOT EXISTS FOR (n:{model.__name__}) ON EACH [{string_fields_query}]",
+            [   
+                f"""CREATE FULLTEXT INDEX {model.__name__}FullTextIndex 
+                IF NOT EXISTS FOR (n:{model.__name__}) ON EACH [{string_fields_query}]
+                OPTIONS {{
+                    indexConfig: {{
+                        `fulltext.analyzer`: 'standard-no-stop-words',
+                        `fulltext.eventually_consistent`: true
+                    }}
+                }}
+                """,
             ]
         )
         print(f"Creating Full Text Index for [green bold]{model.__name__}[/green bold] on fields {", ".join(f"[blue bold]{f}[/blue bold]" for f in string_fields)}")
@@ -70,7 +80,7 @@ def install_indexes_and_constraints():
     async def _run(queries):
 
         async def _run_query(query):
-            result = await Database.cypher_write(query, {})
+            await Database.cypher_write(query, {})
 
         await asyncio.gather(*[_run_query(query) for query in queries])
 

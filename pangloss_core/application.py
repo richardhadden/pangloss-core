@@ -56,7 +56,8 @@ def get_application(settings: BaseSettings):
     _app = FastAPI(
         title=settings.PROJECT_NAME,
         swagger_ui_parameters={"defaultModelExpandDepth": 1, "deepLinking": True},
-        lifespan=lifespan
+        lifespan=lifespan,
+        extra={"something": "someother"}
     )
     _app = setup_api_routes(_app, settings)
     _app = setup_user_routes(_app, settings)
